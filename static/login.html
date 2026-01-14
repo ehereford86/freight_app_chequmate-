@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chequmat Login</title>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: white;
+            font-family: Arial;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        form {
+            background-color: #020617;
+            padding: 30px;
+            border-radius: 10px;
+            width: 280px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 12px;
+            border: none;
+            border-radius: 5px;
+        }
+
+        button {
+            margin-top: 15px;
+            width: 100%;
+            padding: 10px;
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        #output {
+            margin-top: 10px;
+            font-size: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<form onsubmit="login(event)">
+<h2>CHEQUMATE</h2>
+
+    <input id="username" placeholder="Username" required>
+    <input id="password" type="password" placeholder="Password" required>
+
+    <button>Login</button>
+
+    <div id="output"></div>
+</form>
+
+<script>
+console.log("✅ Chequmate JS Loaded");
+
+async function login(event) {
+    event.preventDefault();
+
+    const user = document.getElementById("username").value;
+    const pass = document.getElementById("password").value;
+
+    const url = `/login?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
+
+    console.log("➡️ LOGIN URL:", url);
+
+    const res = await fetch(url);
+    const text = await res.text();
+
+    console.log("⬅️ RAW RESPONSE:", text);
+
+    try {
+        const data = JSON.parse(text);
+        console.log("✅ PARSED JSON:", data);
+
+        if (data.access_token) {
+            localStorage.setItem("chequmate_token", data.access_token);
+            console.log("🎯 TOKEN SAVED");
+            window.location.href = "/dispatcher-panel";
+        } else {
+            document.getElementById("output").innerText = JSON.stringify(data);
+        }
+    } catch (err) {
+        console.error("❌ JSON ERROR:", err);
+        document.getElementById("output").innerText = "Response was not JSON";
+    }
+}
+</script>
+
+</body>
+</html>
+

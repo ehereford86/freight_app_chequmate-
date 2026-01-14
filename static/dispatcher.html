@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chequmate Dispatcher</title>
+</head>
+<body>
+
+<h1>Chequmate Dispatcher Panel</h1>
+<p id="status">Checking authentication…</p>
+
+<script>
+const token = localStorage.getItem("chequmate_token");
+
+if (!token) {
+  alert("Not logged in.");
+  window.location.href = "/";
+}
+
+fetch("/verify-token", {
+  headers: { "Authorization": "Bearer " + token }
+})
+.then(res => res.json())
+.then(data => {
+  document.getElementById("status").innerText = "✅ Logged in as " + data.username;
+})
+.catch(() => {
+  alert("Session expired.");
+  localStorage.removeItem("chequmate_token");
+  window.location.href = "/";
+})
+</script>
+
+</body>
+</html>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chequmate – Dispatcher Panel</title>
+
+    <style>
+        body {
+            background-color: #0f172a;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background-color: #1e293b;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: none;
+        }
+
+        button {
+            margin-top: 15px;
+            width: 100%;
+            padding: 10px;
+            background-color: #2563eb;
+            border: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #020617;
+            border-radius: 8px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>Chequmate Dispatcher Dashboard</h2>
+
+<div class="card">
+    <h3>Broker / Carrier Lookup</h3>
+    <input id="mc" placeholder="Enter MC Number">
+    <button onclick="runLookup()">Search</button>
+</div>
+
+<div id="result"></div>
+
+<script>
+async function runLookup() {
+    const mc = document.getElementById("mc").value;
+
+    const token = localStorage.getItem("chequmate_token");
+
+    if (!token) {
+        alert("Login required first.");
+        return;
+    }
+
+    let res = await fetch(`/verify-broker?mc_number=${mc}`, {
+        headers: { "Authorization": "Bearer " + token }
+    });
+
+    let data = await res.json();
+    document.getElementById("result").innerText = JSON.stringify(data, null, 2);
+}
+</script>
+
+</body>
+</html>
+
