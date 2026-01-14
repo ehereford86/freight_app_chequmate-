@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: chequmate-freight-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn freight_main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FMCSA_KEY
+        sync: false
