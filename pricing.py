@@ -1,43 +1,53 @@
-# pricing.py
-from dataclasses import dataclass
+from fastapi import APIRouter
+from fuel import get_fuel_surcharge
 
-@dataclass
-class QuoteInput:
-    miles: int
-    equipment: str
-    is_alaska: bool
-    over_width: bool
+router = APIRouter()
 
+@router.get("/calculate-rate", description="This is the endpoint your UI button calls.\nIt returns a full breakdown and includes national fuel surcharge per mile.")
+def calculate_rate(
+    miles: float = 0,
+    linehaul_rate: float = 0,
+    deadhead_miles: float = 0,
+    deadhead_rate: float = 0,
+    broker_margin_percent: float = 0.10,
+    broker_fee_flat: float = 0,
+    detention: float = 0,
+    lumper_fee: float = 0,
+    extra_stop_fee: float = 0,
+):
+    fuel = get_fuel_surcharge()
+    fs_per_mile = fuel["fuel_surcharge_per_mile"]
 
-def calculate_chequmat_quote(data: QuoteInput):
-    # Base rates
-    BASE_RATES = {
-        "RGN": 4.10,
-        "FLATBED": 3.25,
-        "STEPDECK": 3.60
-    }
+    linehaul_total = miles * linehaul_rate
+    deadhead_total = deadhead_miles * deadhead_rate
+    fuel_total = (miles + deadhead_miles) * fs_per_mile
+    accessorials_total = detention + lumper_fee + extra_stop_fee
 
-    base_rate = BASE_RATES.get(data.equipment, 3.00)
-    base_linehaul = data.miles * base_rate
-
-    # Alaska uplift
-    alaska_multiplier = 1.30 if data.is_alaska else 1.00
-    adjusted_linehaul = base_linehaul * alaska_multiplier
-
-    # Permits / OSOW
-    permit_cost = 3000 if data.over_width else 0
-
-    carrier_cost = adjusted_linehaul + permit_cost
-
-    # Chequmat margin logic
-    broker_margin = max(1500, carrier_cost * 0.07)
-
-    shipper_rate = carrier_cost + broker_margin
+    subtotal = linehaul_total + deadhead_total + fuel_total + accessorials_total
+    broker_margin_amount = subtotal * broker_margin_percent
+    total = subtotal + broker_margin_amount + broker_fee_flat
 
     return {
-        "miles": data.miles,
-        "equipment": data.equipment,
-        "carrier_cost": round(carrier_cost, 2),
-        "broker_margin": round(broker_margin, 2),
-        "shipper_rate": round(shipper_rate, 2)
+        "inputs": {
+            "miles": miles,
+            "linehaul_rate": linehaul_rate,
+            "deadhead_miles": deadhead_miles,
+            "deadhead_rate": deadhead_rate,
+            "broker_margin_percent": broker_margin_percent,
+            "broker_fee_flat": broker_fee_flat,
+            "detention": detention,
+            "lumper_fee": lumper_fee,
+            "extra_stop_fee": extra_stop_fee,
+        },
+        "fuel": fuel,
+        "breakdown": {
+            "linehaul_total": round(linehaul_total, 2),
+            "deadhead_total": round(deadhead_total, 2),
+            "fuel_total": round(fuel_total, 2),
+            "accessorials_total": round(accessorials_total, 2),
+            "subtotal": round(subtotal, 2),
+            "broker_margin_amount": round(broker_margin_amount, 2),
+            "broker_fee_flat": round(broker_fee_flat, 2),
+            "total": round(total, 2),
+        }
     }
