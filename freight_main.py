@@ -1,4 +1,8 @@
 from fastapi import FastAPI, Query, Depends, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+
 from auth import (
     init_db,
     create_user,
@@ -10,23 +14,64 @@ from auth import (
 )
 from fuel import get_fuel_surcharge
 from fmcsa import lookup_mc
-import sqlite3
 
+import sqlite3
+from pathlib import Path
+
+
+# -------------------------------------------------
+# APP SETUP
+# -------------------------------------------------
 app = FastAPI(title="Freight App API")
 init_db()
 
+BASE_DIR = Path(__file__).resolve().parent
+WEBAPP_DIR = BASE_DIR / "webapp"
+WEBAPP_INDEX = WEBAPP_DIR / "index.html"
+WEBAPP_ASSETS = WEBAPP_DIR / "assets"
 
-# ---------------------
-# BASIC
-# ---------------------
+# CORS (simple + permissive for broker testing; tighten later)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Serve static assets (logo, css, js, etc.)
+if WEBAPP_ASSETS.exists():
+    app.mount("/app/assets", StaticFiles(directory=str(WEBAPP_ASSETS)), name="app_assets")
+
+# Serve the entire webapp folder (css/js) at /app/static/*
+if WEBAPP_DIR.exists():
+    app.mount("/app/static", StaticFiles(directory=str(WEBAPP_DIR)), name="app_static")
+
+
+# -------------------------------------------------
+# WEBSITE UI
+# -------------------------------------------------
+@app.get("/app")
+def app_ui():
+    """
+    Main web UI entry point.
+    This serves the real HTML (not TextEdit HTML junk).
+    """
+    if not WEBAPP_INDEX.exists():
+        raise HTTPException(status_code=404, detail="webapp/index.html not found")
+    return FileResponse(str(WEBAPP_INDEX))
+
+
+# -------------------------------------------------
+# BASIC API
+# -------------------------------------------------
 @app.get("/")
 def home():
     return {"message": "Freight app API is running"}
 
-
-# Render (and other platforms) may send HEAD / for health checks
 @app.head("/")
 def home_head():
+    # Render/hosts may health-check with HEAD
     return
 
 
@@ -35,9 +80,9 @@ def fuel_surcharge():
     return get_fuel_surcharge()
 
 
-# ---------------------
+# -------------------------------------------------
 # AUTH (GET for quick curl testing)
-# ---------------------
+# -------------------------------------------------
 @app.get("/register")
 def register(username: str, password: str, role: str = "dispatcher"):
     # prevent self-registering as broker/broker_carrier
@@ -73,9 +118,9 @@ def verify_token(user=Depends(get_current_user)):
     }
 
 
-# ---------------------
+# -------------------------------------------------
 # BROKER ONBOARDING
-# ---------------------
+# -------------------------------------------------
 @app.get(
     "/broker-onboard",
     description=(
@@ -127,14 +172,11 @@ def broker_onboard(mc_number: str, user=Depends(get_current_user)):
 def verify_broker(user=Depends(get_current_user)):
     """
     Broker-only verification endpoint.
-    IMPORTANT: We do NOT accept a query mc_number here.
-    We verify the logged-in user's stored mc_number verifies broker access.
+    We verify the logged-in user's stored mc_number.
     """
-    # Must be a broker role
     if user["role"] not in ("broker", "broker_carrier"):
         raise HTTPException(status_code=403, detail="Broker access only")
 
-    # Must be approved (prevents pending users from hitting broker endpoints)
     if (user.get("broker_status") or "none") != "approved":
         raise HTTPException(status_code=403, detail="Broker not approved")
 
@@ -145,9 +187,9 @@ def verify_broker(user=Depends(get_current_user)):
     return lookup_mc(mc_number)
 
 
-# ---------------------
+# -------------------------------------------------
 # ADMIN: MANUAL APPROVAL (FOR TESTING WHEN FMCSA IS BLOCKED)
-# ---------------------
+# -------------------------------------------------
 def require_admin(user=Depends(get_current_user)):
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access only")
@@ -181,7 +223,6 @@ def admin_reject_broker(
     username: str,
     admin=Depends(require_admin),
 ):
-    # Rejected blocks broker verification; keep role unchanged
     set_broker_request(username, "", "rejected")
     return {
         "success": True,
@@ -204,9 +245,9 @@ def admin_list_broker_requests(admin=Depends(require_admin)):
     ]
 
 
-# ---------------------
+# -------------------------------------------------
 # PRICING / CALC
-# ---------------------
+# -------------------------------------------------
 @app.get("/calculate-rate")
 def calculate_rate(
     miles: float,
@@ -239,17 +280,12 @@ def calculate_rate(
     diesel_price = fs_data["diesel_price"]
     fs_per_mile = fs_data["fuel_surcharge_per_mile"]
 
-    # BASE LINEHAUL
     base_cost = miles * linehaul_rate
-
-    # DEADHEAD
     deadhead_cost = deadhead_miles * deadhead_rate
 
-    # FUEL SURCHARGE (per mile)
     all_miles = miles + deadhead_miles
     fs_amount = all_miles * fs_per_mile
 
-    # STANDARD ACCESSORIAL TOTAL
     standard_accessorials = {
         "tonu": tonu,
         "layover": layover,
@@ -265,7 +301,6 @@ def calculate_rate(
     }
     standard_total = sum(standard_accessorials.values())
 
-    # CUSTOM ACCESSORIALS
     if len(custom_names) != len(custom_amounts):
         raise HTTPException(
             status_code=400,
@@ -275,20 +310,14 @@ def calculate_rate(
     custom_items = [{"name": n, "amount": a} for n, a in zip(custom_names, custom_amounts)]
     custom_total = sum(custom_amounts)
 
-    # TOTAL REVENUE BEFORE SPLITS
     total_revenue = base_cost + fs_amount + deadhead_cost + standard_total + custom_total
 
-    # DRIVER PAY
     driver_pay = driver_flat_rate if driver_flat_rate > 0 else total_revenue * driver_percent
-
-    # BROKER FEES
     broker_margin = total_revenue * broker_margin_percent
     broker_total_fees = broker_margin + broker_fee_flat
 
-    # TRUCK/CARRIER PAY
     truck_pay = total_revenue - broker_total_fees
 
-    # PROFIT
     profit_total = broker_total_fees
     profit_per_mile = profit_total / all_miles if all_miles > 0 else 0
 
