@@ -33,8 +33,8 @@ def home():
     return {"message": "Freight app API is running"}
 
 # Render (and some proxies) may send HEAD /
-@app.head("/")
-def home_head():
+@app.head("/app")
+def app_ui_head():
     return Response(status_code=200)
 
 # -----------------------------
