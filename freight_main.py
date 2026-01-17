@@ -17,8 +17,8 @@ WEBAPP_DIR = BASE_DIR / "webapp"
 @app.middleware("http")
 async def no_cache_ui_assets(request, call_next):
     resp = await call_next(request)
-    p = request.url.path
 
+    p = request.url.path
     if p == "/app" or p.startswith("/webapp/"):
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         resp.headers["Pragma"] = "no-cache"
@@ -50,13 +50,13 @@ def app_ui():
     if not index_file.exists():
         return JSONResponse(status_code=404, content={"detail": "webapp/index.html not found"})
 
-    # IMPORTANT: force correct HTML content-type so browsers render it
+    # FORCE the browser to render it as HTML (prevents "raw text" display)
     return FileResponse(index_file, media_type="text/html; charset=utf-8")
 
-# -----------------------------
-# Static assets
-# -----------------------------
-# Always mount /webapp (it’s fine if it’s empty locally; in deploy it will exist)
+# Serve static assets:
+#   /webapp/app.css
+#   /webapp/app.js
+#   /webapp/assets/chequmate-logo.png
 app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR)), name="webapp")
 
 # -----------------------------
