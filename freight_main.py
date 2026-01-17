@@ -52,14 +52,22 @@ def app_ui():
     index_file = WEBAPP_DIR / "index.html"
     if not index_file.exists():
         return JSONResponse(status_code=404, content={"detail": "webapp/index.html not found"})
-    return FileResponse(index_file)
+
+    # IMPORTANT: force correct content-type so browser renders HTML (not raw text)
+    return FileResponse(index_file, media_type="text/html")
 
 # Serve static assets:
 #   /webapp/app.css
 #   /webapp/app.js
 #   /webapp/assets/chequmate-logo.png
-if WEBAPP_DIR.exists():
-    app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR)), name="webapp")
+#
+# IMPORTANT: mount unconditionally, and don't fail startup if the folder isn't present at import time.
+# (On Render, build/start timing can make conditional mounts flaky.)
+app.mount(
+    "/webapp",
+    StaticFiles(directory=str(WEBAPP_DIR), check_dir=False),
+    name="webapp",
+)
 
 # -----------------------------
 # API Routers
