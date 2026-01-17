@@ -1,218 +1,247 @@
-// Chequmate Freight UI (Calculator first, clean output)
-// Build stamp helps us confirm Render is serving the right file.
-const BUILD = "CALC_UI_v1_2026-01-17";
+/* Chequmate Freight App UI
+   - Same-origin API calls (Render + local)
+   - Clean UI: shows totals + a collapsible Details section
+   - No broker fields, no raw JSON dump unless you expand Details
+*/
+
 const API_BASE = ""; // same-origin
 
 function $(sel){ return document.querySelector(sel); }
 function esc(s){ return String(s ?? "").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function num(v){ const n = Number(v); return Number.isFinite(n) ? n : 0; }
-function money(v){
+function num(v, fallback=0){
   const n = Number(v);
-  if (!Number.isFinite(n)) return "$0.00";
-  return n.toLocaleString(undefined, { style:"currency", currency:"USD" });
+  return Number.isFinite(n) ? n : fallback;
 }
-function milesFmt(v){
-  const n = Number(v);
-  if (!Number.isFinite(n)) return "0";
-  return n.toLocaleString();
+function money(v){
+  const n = num(v, 0);
+  return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+function fixed(v, d=3){
+  const n = num(v, 0);
+  return n.toFixed(d);
 }
 
 async function apiGet(path){
   const res = await fetch(API_BASE + path, { method: "GET" });
   const text = await res.text();
   let data;
-  try { data = JSON.parse(text); } catch { data = { raw:text }; }
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
   if (!res.ok){
-    const msg = data?.detail || data?.error || ("HTTP " + res.status);
+    const msg = data?.detail || data?.error || `HTTP ${res.status}`;
     throw new Error(msg);
   }
   return data;
 }
 
-function appShell(){
+function render(){
   $("#app").innerHTML = `
-    <div class="container">
-      <div class="topbar">
+    <div class="page">
+      <header class="topbar">
         <div class="brand">
-          <div class="logo"><img src="/webapp/assets/chequmate-logo.png" alt="Chequmate"/></div>
-          <div>
-            <h1>Freight App</h1>
-            <div class="sub">Calculator • Dispatcher • Driver testing UI</div>
+          <img class="logo" src="/webapp/assets/chequmate-logo.png" alt="Chequmate" />
+          <div class="brandtext">
+            <div class="title">Freight App</div>
+            <div class="subtitle">Rate + Fuel Surcharge Calculator</div>
           </div>
         </div>
-        <div class="badge" title="Build stamp">${esc(BUILD)}</div>
-      </div>
+        <div class="status" id="status">Ready</div>
+      </header>
 
-      <div class="grid">
-        <div class="card">
-          <h2>Calculator</h2>
+      <main class="main">
+        <section class="card">
+          <h2>Inputs</h2>
 
-          <div class="row">
-            <div class="field">
-              <label>Miles</label>
-              <input id="miles" type="number" step="1" value="650" />
-            </div>
-            <div class="field">
-              <label>Linehaul rate ($/mile)</label>
-              <input id="linehaul_rate" type="number" step="0.01" value="3.00" />
-            </div>
-          </div>
+          <div class="grid">
+            <label class="field">
+              <span>Miles</span>
+              <input id="miles" inputmode="decimal" placeholder="650" />
+            </label>
 
-          <div class="row">
-            <div class="field">
-              <label>Deadhead miles</label>
-              <input id="deadhead_miles" type="number" step="1" value="75" />
-            </div>
-            <div class="field">
-              <label>Deadhead rate ($/mile)</label>
-              <input id="deadhead_rate" type="number" step="0.01" value="0" />
-            </div>
-          </div>
+            <label class="field">
+              <span>Linehaul rate ($/mile)</span>
+              <input id="linehaul_rate" inputmode="decimal" placeholder="3.00" />
+            </label>
 
-          <div class="row">
-            <div class="field">
-              <label>Detention ($)</label>
-              <input id="detention" type="number" step="1" value="0" />
-            </div>
-            <div class="field">
-              <label>Lumper ($)</label>
-              <input id="lumper_fee" type="number" step="1" value="0" />
-            </div>
-          </div>
+            <label class="field">
+              <span>Deadhead miles</span>
+              <input id="deadhead_miles" inputmode="decimal" placeholder="75" />
+            </label>
 
-          <div class="row">
-            <div class="field">
-              <label>Extra stop ($)</label>
-              <input id="extra_stop_fee" type="number" step="1" value="0" />
-            </div>
-            <div class="field">
-              <label>Fuel surcharge (auto)</label>
-              <input id="fuel_status" type="text" value="Auto from EIA" disabled />
-            </div>
+            <label class="field">
+              <span>Deadhead rate ($/mile)</span>
+              <input id="deadhead_rate" inputmode="decimal" placeholder="0.00" />
+            </label>
+
+            <label class="field">
+              <span>Detention ($)</span>
+              <input id="detention" inputmode="decimal" placeholder="0" />
+            </label>
+
+            <label class="field">
+              <span>Lumper ($)</span>
+              <input id="lumper_fee" inputmode="decimal" placeholder="0" />
+            </label>
+
+            <label class="field">
+              <span>Extra stop ($)</span>
+              <input id="extra_stop_fee" inputmode="decimal" placeholder="0" />
+            </label>
           </div>
 
           <div class="actions">
-            <button class="primary" id="btnCalc">Calculate</button>
-            <button class="secondary" id="btnToggleRaw">Show raw JSON</button>
+            <button id="calcBtn" class="btn">Calculate</button>
+            <button id="fillBtn" class="btn ghost">Fill example</button>
           </div>
+        </section>
 
-          <div class="alert small">
-            Tip: If fuel is unavailable, totals still calculate — fuel shows $0 and an explanation.
-          </div>
-        </div>
-
-        <div class="card">
+        <section class="card">
           <h2>Results</h2>
 
-          <div class="kpis">
-            <div class="kpi">
-              <div class="label">Total</div>
-              <div class="value" id="kpiTotal">$0.00</div>
-            </div>
-            <div class="kpi">
-              <div class="label">Fuel (est.)</div>
-              <div class="value" id="kpiFuel">$0.00</div>
-            </div>
+          <div id="result" class="result">
+            <div class="muted">Run a calculation to see results.</div>
           </div>
 
-          <table class="table">
-            <tr><td>Linehaul</td><td id="rowLinehaul">$0.00</td></tr>
-            <tr><td>Deadhead</td><td id="rowDeadhead">$0.00</td></tr>
-            <tr><td>Fuel</td><td id="rowFuel">$0.00</td></tr>
-            <tr><td>Accessorials</td><td id="rowAcc">$0.00</td></tr>
-            <tr><td>Subtotal</td><td id="rowSub">$0.00</td></tr>
-            <tr><td>Total</td><td id="rowTotal">$0.00</td></tr>
-          </table>
+          <details class="details" id="detailsWrap">
+            <summary>Details (raw JSON)</summary>
+            <pre id="jsonBox" class="code"></pre>
+          </details>
+        </section>
+      </main>
 
-          <div class="alert" id="fuelNote" style="display:none;"></div>
-
-          <div id="rawWrap" style="display:none;">
-            <div class="raw" id="rawOut"></div>
-          </div>
-        </div>
-      </div>
+      <footer class="footer">
+        <span class="muted">Tip: if diesel price is unavailable, fuel surcharge will be $0 and the app will continue normally.</span>
+      </footer>
     </div>
   `;
 }
 
-function setResults(data){
-  const b = data?.breakdown || {};
-  const f = data?.fuel || {};
-
-  $("#kpiTotal").textContent = money(b.total ?? 0);
-  $("#kpiFuel").textContent  = money(b.fuel_total ?? 0);
-
-  $("#rowLinehaul").textContent = money(b.linehaul_total ?? 0);
-  $("#rowDeadhead").textContent = money(b.deadhead_total ?? 0);
-  $("#rowFuel").textContent     = money(b.fuel_total ?? 0);
-  $("#rowAcc").textContent      = money(b.accessorials_total ?? 0);
-  $("#rowSub").textContent      = money(b.subtotal ?? 0);
-  $("#rowTotal").textContent    = money(b.total ?? 0);
-
-  // Fuel note
-  const noteEl = $("#fuelNote");
-  if (f?.error){
-    noteEl.style.display = "block";
-    noteEl.textContent = `Fuel note: ${f.error}`;
-  } else {
-    noteEl.style.display = "none";
-    noteEl.textContent = "";
-  }
-
-  // Raw JSON (for debugging)
-  $("#rawOut").textContent = JSON.stringify(data, null, 2);
+function setStatus(msg, kind="ok"){
+  const el = $("#status");
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `status ${kind}`;
 }
 
-async function runCalc(){
-  const miles = num($("#miles").value);
-  const linehaul_rate = num($("#linehaul_rate").value);
-  const deadhead_miles = num($("#deadhead_miles").value);
-  const deadhead_rate = num($("#deadhead_rate").value);
-  const detention = num($("#detention").value);
-  const lumper_fee = num($("#lumper_fee").value);
-  const extra_stop_fee = num($("#extra_stop_fee").value);
+function fillExample(){
+  $("#miles").value = "650";
+  $("#linehaul_rate").value = "3.00";
+  $("#deadhead_miles").value = "75";
+  $("#deadhead_rate").value = "0.00";
+  $("#detention").value = "0";
+  $("#lumper_fee").value = "0";
+  $("#extra_stop_fee").value = "0";
+}
 
-  const qs =
-    `miles=${encodeURIComponent(miles)}` +
-    `&linehaul_rate=${encodeURIComponent(linehaul_rate)}` +
-    `&deadhead_miles=${encodeURIComponent(deadhead_miles)}` +
-    `&deadhead_rate=${encodeURIComponent(deadhead_rate)}` +
-    `&detention=${encodeURIComponent(detention)}` +
-    `&lumper_fee=${encodeURIComponent(lumper_fee)}` +
-    `&extra_stop_fee=${encodeURIComponent(extra_stop_fee)}`;
+function renderResult(data){
+  const inputs = data?.inputs || {};
+  const fuel = data?.fuel || {};
+  const breakdown = data?.breakdown || {};
 
-  $("#btnCalc").disabled = true;
-  $("#btnCalc").textContent = "Calculating...";
+  const diesel = fuel?.diesel_price;
+  const fsc = fuel?.fuel_surcharge_per_mile;
 
+  const dieselLine = (diesel === null || diesel === undefined)
+    ? `<div class="kv"><span>Diesel price</span><span class="warn">Unavailable</span></div>`
+    : `<div class="kv"><span>Diesel price</span><span>$${fixed(diesel, 3)}</span></div>`;
+
+  const fscLine = (fsc === null || fsc === undefined)
+    ? `<div class="kv"><span>Fuel surcharge / mile</span><span class="warn">Unavailable</span></div>`
+    : `<div class="kv"><span>Fuel surcharge / mile</span><span>$${fixed(fsc, 4)}</span></div>`;
+
+  const html = `
+    <div class="resultGrid">
+      <div class="panel">
+        <h3>Summary</h3>
+        <div class="kv"><span>Total</span><span class="big">${money(breakdown.total)}</span></div>
+        <div class="kv"><span>Subtotal</span><span>${money(breakdown.subtotal)}</span></div>
+      </div>
+
+      <div class="panel">
+        <h3>Line Items</h3>
+        <div class="kv"><span>Linehaul</span><span>${money(breakdown.linehaul_total)}</span></div>
+        <div class="kv"><span>Deadhead</span><span>${money(breakdown.deadhead_total)}</span></div>
+        <div class="kv"><span>Fuel</span><span>${money(breakdown.fuel_total)}</span></div>
+        <div class="kv"><span>Accessorials</span><span>${money(breakdown.accessorials_total)}</span></div>
+      </div>
+
+      <div class="panel">
+        <h3>Fuel</h3>
+        ${dieselLine}
+        ${fscLine}
+        <div class="kv"><span>Base price</span><span>$${fixed(fuel.base_price ?? 1.25, 2)}</span></div>
+        <div class="kv"><span>Multiplier</span><span>${fixed(fuel.multiplier_used ?? 0.06, 3)}</span></div>
+      </div>
+
+      <div class="panel">
+        <h3>Inputs Used</h3>
+        <div class="kv"><span>Miles</span><span>${esc(inputs.miles)}</span></div>
+        <div class="kv"><span>Linehaul rate</span><span>${esc(inputs.linehaul_rate)}</span></div>
+        <div class="kv"><span>Deadhead miles</span><span>${esc(inputs.deadhead_miles)}</span></div>
+      </div>
+    </div>
+  `;
+
+  $("#result").innerHTML = html;
+  $("#jsonBox").textContent = JSON.stringify(data, null, 2);
+}
+
+async function onCalculate(){
   try{
-    const data = await apiGet(`/calculate-rate?${qs}`);
-    setResults(data);
-  } catch (e){
-    $("#rawWrap").style.display = "block";
-    $("#rawOut").textContent = String(e?.message || e);
-    $("#fuelNote").style.display = "block";
-    $("#fuelNote").textContent = "Error: " + String(e?.message || e);
-  } finally {
-    $("#btnCalc").disabled = false;
-    $("#btnCalc").textContent = "Calculate";
+    setStatus("Calculating…", "work");
+
+    const miles = num($("#miles").value);
+    const linehaul_rate = num($("#linehaul_rate").value);
+    const deadhead_miles = num($("#deadhead_miles").value);
+    const deadhead_rate = num($("#deadhead_rate").value);
+    const detention = num($("#detention").value);
+    const lumper_fee = num($("#lumper_fee").value);
+    const extra_stop_fee = num($("#extra_stop_fee").value);
+
+    // Basic guardrails (no crashing, just clear errors)
+    if (miles <= 0) throw new Error("Miles must be greater than 0.");
+    if (linehaul_rate <= 0) throw new Error("Linehaul rate must be greater than 0.");
+
+    const qs = new URLSearchParams({
+      miles: String(miles),
+      linehaul_rate: String(linehaul_rate),
+      deadhead_miles: String(deadhead_miles),
+      deadhead_rate: String(deadhead_rate),
+      detention: String(detention),
+      lumper_fee: String(lumper_fee),
+      extra_stop_fee: String(extra_stop_fee),
+    });
+
+    const data = await apiGet(`/calculate-rate?${qs.toString()}`);
+    renderResult(data);
+    setStatus("Done", "ok");
+  }catch(err){
+    setStatus(err?.message || "Error", "bad");
+    $("#result").innerHTML = `<div class="error">Error: ${esc(err?.message || "Unknown error")}</div>`;
+    $("#jsonBox").textContent = "";
   }
 }
 
-function wire(){
-  $("#btnCalc").addEventListener("click", runCalc);
-  $("#btnToggleRaw").addEventListener("click", () => {
-    const wrap = $("#rawWrap");
-    const on = wrap.style.display !== "none";
-    wrap.style.display = on ? "none" : "block";
-    $("#btnToggleRaw").textContent = on ? "Show raw JSON" : "Hide raw JSON";
+function bind(){
+  $("#calcBtn").addEventListener("click", onCalculate);
+  $("#fillBtn").addEventListener("click", () => {
+    fillExample();
+    setStatus("Example filled", "ok");
   });
 
-  // Auto-run once
-  runCalc();
+  // Enter key triggers calculate
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter"){
+      const active = document.activeElement;
+      if (active && active.tagName === "INPUT"){
+        e.preventDefault();
+        onCalculate();
+      }
+    }
+  });
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  appShell();
-  wire();
-  console.log("UI BUILD:", BUILD);
+  render();
+  bind();
+  fillExample();
 });
