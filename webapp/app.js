@@ -1,30 +1,79 @@
 /*
-  CALC_UI_v1
-  - Same-origin API
-  - Layout matches your screenshot:
-    * 2-col calculator form
-    * buttons row
-    * results: two stat cards + left/right breakdown rows
-    * raw JSON only when button pressed
+  Chequmate Freight App UI
+  - Keeps Login + Register
+  - Keeps Calculator
+  - Results formatted (NO raw text unless you click "Show raw JSON"):
+      * two stat cards: Total + Fuel (est.)
+      * breakdown rows: label left, value right
+  - Uses backend route: GET /calculate-rate (per your OpenAPI)
 */
 
 const API_BASE = ""; // same-origin
 
-function $(s){ return document.querySelector(s); }
-function num(v, f=0){ const n = Number(v); return Number.isFinite(n) ? n : f; }
-function money(v){ return num(v,0).toLocaleString(undefined,{style:"currency",currency:"USD"}); }
+function $(sel){ return document.querySelector(sel); }
+function num(v, fallback=0){
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+function money(v){
+  const n = num(v, 0);
+  return n.toLocaleString(undefined, { style:"currency", currency:"USD" });
+}
+
+function getToken(){ return localStorage.getItem("token") || ""; }
+function setToken(t){ localStorage.setItem("token", t); }
+function clearToken(){ localStorage.removeItem("token"); }
 
 async function apiGet(path){
-  const res = await fetch(API_BASE + path, { method:"GET" });
+  const headers = {};
+  const token = getToken();
+  if(token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(API_BASE + path, { method:"GET", headers });
   const txt = await res.text();
-  let data; try{ data = JSON.parse(txt); }catch{ data = { raw: txt }; }
+  let data;
+  try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
+
   if(!res.ok){
     throw new Error(data?.detail || data?.error || `HTTP ${res.status}`);
   }
   return data;
 }
 
-function qs(){
+async function apiPost(path, body){
+  const headers = { "Content-Type":"application/json" };
+  const token = getToken();
+  if(token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(API_BASE + path, {
+    method:"POST",
+    headers,
+    body: JSON.stringify(body || {})
+  });
+
+  const txt = await res.text();
+  let data;
+  try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
+
+  if(!res.ok){
+    throw new Error(data?.detail || data?.error || `HTTP ${res.status}`);
+  }
+  return data;
+}
+
+function setStatusPill(text){
+  const el = $("#statusPill");
+  if(el) el.textContent = text;
+}
+
+function setAuthBadge(){
+  const token = getToken();
+  const badge = $("#authBadge");
+  if(!badge) return;
+  badge.textContent = token ? "Logged in" : "Not logged in";
+}
+
+function buildQuery(){
   const p = new URLSearchParams({
     miles: String(num($("#miles").value, 0)),
     linehaul_rate: String(num($("#linehaul_rate").value, 0)),
@@ -37,13 +86,118 @@ function qs(){
   return p.toString();
 }
 
-function row(label, value){
+function kvRow(label, value){
   return `
     <div class="kv">
       <div class="k">${label}</div>
       <div class="v">${value}</div>
     </div>
   `;
+}
+
+function applyResults(data){
+  // Accept multiple response shapes without breaking UI
+  const breakdown = data.breakdown || data.totals || data || {};
+
+  const total =
+    data.total ?? breakdown.total ?? breakdown.grand_total ?? 0;
+
+  const fuel =
+    (data.fuel && (data.fuel.fuel_total ?? data.fuel.total ?? data.fuel.est ?? 0)) ??
+    breakdown.fuel_total ?? breakdown.fuel ?? 0;
+
+  const linehaul =
+    breakdown.linehaul_total ?? breakdown.linehaul ?? 0;
+
+  const deadhead =
+    breakdown.deadhead_total ?? breakdown.deadhead ?? 0;
+
+  const accessorials =
+    breakdown.accessorials_total ?? breakdown.accessorials ?? 0;
+
+  const subtotal =
+    breakdown.subtotal ?? 0;
+
+  $("#totalStat").textContent = money(total);
+  $("#fuelStat").textContent  = money(fuel);
+
+  const rows = [];
+  rows.push(kvRow("Linehaul", money(linehaul)));
+  rows.push(kvRow("Deadhead", money(deadhead)));
+  rows.push(kvRow("Fuel", money(fuel)));
+  if(num(accessorials,0) !== 0) rows.push(kvRow("Accessorials", money(accessorials)));
+  if(num(subtotal,0) !== 0) rows.push(kvRow("Subtotal", money(subtotal)));
+  rows.push(`<div class="divider"></div>`);
+  rows.push(kvRow("Total", money(total)));
+
+  $("#breakdown").innerHTML = rows.join("");
+
+  $("#raw").textContent = JSON.stringify(data, null, 2);
+}
+
+async function doCalculate(){
+  try{
+    setStatusPill("CALC_UI_v1_2026-01-17");
+    const data = await apiGet(`/calculate-rate?${buildQuery()}`);
+    applyResults(data);
+  }catch(err){
+    setStatusPill(`Calc failed: ${err.message}`);
+    // Keep layout, just show zeros
+    $("#totalStat").textContent = money(0);
+    $("#fuelStat").textContent  = money(0);
+    $("#breakdown").innerHTML = kvRow("Total", money(0));
+    $("#raw").textContent = "";
+  }
+}
+
+async function doRegister(){
+  const u = ($("#reg_username")?.value || "").trim();
+  const p = ($("#reg_password")?.value || "").trim();
+  const r = $("#reg_role")?.value || "driver";
+
+  if(!u || !p){
+    setStatusPill("Register failed: missing username/password");
+    return;
+  }
+
+  try{
+    const data = await apiPost("/register", { username:u, password:p, role:r });
+    // Many backends return token on register; if not, user can login
+    if(data?.token) setToken(data.token);
+    setAuthBadge();
+    setStatusPill("Registered");
+  }catch(err){
+    setStatusPill(`Register failed: ${err.message}`);
+  }
+}
+
+async function doLogin(){
+  const u = ($("#login_username")?.value || "").trim();
+  const p = ($("#login_password")?.value || "").trim();
+
+  if(!u || !p){
+    setStatusPill("Login failed: missing username/password");
+    return;
+  }
+
+  try{
+    const data = await apiPost("/login", { username:u, password:p });
+    if(data?.token){
+      setToken(data.token);
+      setAuthBadge();
+      setStatusPill("Logged in");
+    }else{
+      setStatusPill("Login failed: no token returned");
+    }
+  }catch(err){
+    setStatusPill(`Login failed: ${err.message}`);
+  }
+}
+
+function doLogout(){
+  clearToken();
+  setAuthBadge();
+  setStatusPill("Logged out");
 }
 
 function render(){
@@ -57,12 +211,67 @@ function render(){
             <div class="subtitle">Calculator · Dispatcher · Driver testing UI</div>
           </div>
         </div>
-        <div class="pill" id="pill">CALC_UI_v1_2026-01-17</div>
+
+        <div class="rightPills">
+          <div class="pill" id="authBadge">Not logged in</div>
+          <div class="pill" id="statusPill">CALC_UI_v1_2026-01-17</div>
+        </div>
       </header>
 
+      <!-- AUTH (keep login/register on the page) -->
+      <section class="card">
+        <div class="cardHeaderRow">
+          <h2>Login</h2>
+          <button class="btn2" id="logoutBtn" type="button">Logout</button>
+        </div>
+
+        <div class="form2">
+          <div class="field">
+            <label>Username</label>
+            <input id="login_username" placeholder="Username" />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input id="login_password" type="password" placeholder="Password" />
+          </div>
+        </div>
+
+        <div class="btnrow">
+          <button class="btn" id="loginBtn" type="button">Login</button>
+        </div>
+
+        <div style="height:14px"></div>
+
+        <h2>Register</h2>
+        <div class="form2">
+          <div class="field">
+            <label>Username</label>
+            <input id="reg_username" placeholder="Username" />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input id="reg_password" type="password" placeholder="Password" />
+          </div>
+          <div class="field">
+            <label>Role</label>
+            <select id="reg_role">
+              <option value="broker">Broker</option>
+              <option value="dispatcher">Dispatcher</option>
+              <option value="driver" selected>Driver</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button class="btn" id="registerBtn" type="button">Register</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- CALCULATOR -->
       <section class="card">
         <h2>Calculator</h2>
 
+        <!-- 2-column grid like your screenshot -->
         <div class="form2">
           <div class="field">
             <label>Miles</label>
@@ -106,8 +315,8 @@ function render(){
         </div>
 
         <div class="btnrow">
-          <button class="btn" id="calcBtn">Calculate</button>
-          <button class="btn2" id="rawBtn">Show raw JSON</button>
+          <button class="btn" id="calcBtn" type="button">Calculate</button>
+          <button class="btn2" id="rawBtn" type="button">Show raw JSON</button>
         </div>
 
         <div class="hint">
@@ -116,83 +325,41 @@ function render(){
 
         <div class="resultsTitle">Results</div>
 
+        <!-- EXACT: two stat cards -->
         <div class="statGrid">
           <div class="stat">
             <div class="statLabel">Total</div>
-            <div class="statValue" id="total">$0.00</div>
+            <div class="statValue" id="totalStat">$0.00</div>
           </div>
+
           <div class="stat">
             <div class="statLabel">Fuel (est.)</div>
-            <div class="statValue" id="fuel">$0.00</div>
+            <div class="statValue" id="fuelStat">$0.00</div>
           </div>
         </div>
 
-        <div class="breakdown" id="breakdown"></div>
+        <!-- EXACT: breakdown rows (label left, value right) -->
+        <div class="breakdown" id="breakdown">
+          ${kvRow("Total", money(0))}
+        </div>
 
         <pre class="raw" id="raw" style="display:none;"></pre>
       </section>
     </div>
   `;
 
-  $("#calcBtn").addEventListener("click", calculate);
+  // wire up buttons
+  $("#calcBtn").addEventListener("click", doCalculate);
   $("#rawBtn").addEventListener("click", () => {
     const el = $("#raw");
     el.style.display = (el.style.display === "none") ? "block" : "none";
   });
+
+  $("#loginBtn").addEventListener("click", doLogin);
+  $("#registerBtn").addEventListener("click", doRegister);
+  $("#logoutBtn").addEventListener("click", doLogout);
+
+  setAuthBadge();
 }
 
-function setPill(ok, msg){
-  const el = $("#pill");
-  if(!el) return;
-  el.textContent = ok ? "CALC_UI_v1_2026-01-17" : `Calc failed: ${msg}`;
-}
-
-function applyResults(data){
-  const breakdown = data.breakdown || data.totals || {};
-  const total = data.total ?? breakdown.total ?? 0;
-
-  // Try common fuel shapes used earlier
-  const fuel =
-    (data.fuel && (data.fuel.fuel_total ?? data.fuel.total ?? data.fuel.est ?? 0)) ??
-    breakdown.fuel_total ?? 0;
-
-  $("#total").textContent = money(total);
-  $("#fuel").textContent  = money(fuel);
-
-  const linehaul = breakdown.linehaul_total ?? breakdown.linehaul ?? 0;
-  const deadhead = breakdown.deadhead_total ?? breakdown.deadhead ?? 0;
-  const acc      = breakdown.accessorials_total ?? breakdown.accessorials ?? 0;
-  const subtotal = breakdown.subtotal ?? 0;
-
-  const rows = [];
-  rows.push(row("Linehaul", money(linehaul)));
-  rows.push(row("Deadhead", money(deadhead)));
-  rows.push(row("Fuel", money(fuel)));
-  if(acc) rows.push(row("Accessorials", money(acc)));
-  if(subtotal) rows.push(row("Subtotal", money(subtotal)));
-  rows.push(`<div class="divider"></div>`);
-  rows.push(row("Total", money(total)));
-
-  $("#breakdown").innerHTML = rows.join("");
-
-  $("#raw").textContent = JSON.stringify(data, null, 2);
-}
-
-async function calculate(){
-  try{
-    setPill(true, "");
-    // IMPORTANT: backend route you showed is /calculate-rate
-    const data = await apiGet(`/calculate-rate?${qs()}`);
-    applyResults(data);
-  }catch(e){
-    setPill(false, e.message);
-    $("#total").textContent = money(0);
-    $("#fuel").textContent = money(0);
-    $("#breakdown").innerHTML = row("Total", money(0));
-    $("#raw").textContent = "";
-  }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  render();
-});
+document.addEventListener("DOMContentLoaded", render);
