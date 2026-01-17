@@ -1,36 +1,50 @@
 /*
-  Chequmate Freight App UI
-  - Keeps Login + Register
-  - Keeps Calculator
-  - Results formatted (NO raw text unless you click "Show raw JSON"):
-      * two stat cards: Total + Fuel (est.)
-      * breakdown rows: label left, value right
-  - Uses backend route: GET /calculate-rate (per your OpenAPI)
+  UI requirements (what you asked for):
+  1) Keep Login + Register on the page.
+  2) Calculator stays 2-column layout.
+  3) Results are NOT raw text:
+     - 2 stat cards: Total + Fuel (est.)
+     - Breakdown rows: label left, value right
+  4) Calls real backend route: GET /calculate-rate (per your OpenAPI).
 */
 
 const API_BASE = ""; // same-origin
 
-function $(sel){ return document.querySelector(sel); }
-function num(v, fallback=0){
+const $ = (sel) => document.querySelector(sel);
+
+const num = (v, fallback=0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
-}
-function money(v){
+};
+
+const money = (v) => {
   const n = num(v, 0);
   return n.toLocaleString(undefined, { style:"currency", currency:"USD" });
+};
+
+const getToken = () => localStorage.getItem("token") || "";
+const setToken = (t) => localStorage.setItem("token", t);
+const clearToken = () => localStorage.removeItem("token");
+
+function setStatus(text){
+  const el = $("#statusPill");
+  if(el) el.textContent = text;
 }
 
-function getToken(){ return localStorage.getItem("token") || ""; }
-function setToken(t){ localStorage.setItem("token", t); }
-function clearToken(){ localStorage.removeItem("token"); }
+function setAuthBadge(){
+  const el = $("#authBadge");
+  if(!el) return;
+  el.textContent = getToken() ? "Logged in" : "Not logged in";
+}
 
 async function apiGet(path){
   const headers = {};
-  const token = getToken();
-  if(token) headers["Authorization"] = `Bearer ${token}`;
+  const tok = getToken();
+  if(tok) headers["Authorization"] = `Bearer ${tok}`;
 
   const res = await fetch(API_BASE + path, { method:"GET", headers });
   const txt = await res.text();
+
   let data;
   try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
 
@@ -42,8 +56,8 @@ async function apiGet(path){
 
 async function apiPost(path, body){
   const headers = { "Content-Type":"application/json" };
-  const token = getToken();
-  if(token) headers["Authorization"] = `Bearer ${token}`;
+  const tok = getToken();
+  if(tok) headers["Authorization"] = `Bearer ${tok}`;
 
   const res = await fetch(API_BASE + path, {
     method:"POST",
@@ -61,31 +75,6 @@ async function apiPost(path, body){
   return data;
 }
 
-function setStatusPill(text){
-  const el = $("#statusPill");
-  if(el) el.textContent = text;
-}
-
-function setAuthBadge(){
-  const token = getToken();
-  const badge = $("#authBadge");
-  if(!badge) return;
-  badge.textContent = token ? "Logged in" : "Not logged in";
-}
-
-function buildQuery(){
-  const p = new URLSearchParams({
-    miles: String(num($("#miles").value, 0)),
-    linehaul_rate: String(num($("#linehaul_rate").value, 0)),
-    deadhead_miles: String(num($("#deadhead_miles").value, 0)),
-    deadhead_rate: String(num($("#deadhead_rate").value, 0)),
-    detention: String(num($("#detention").value, 0)),
-    lumper_fee: String(num($("#lumper_fee").value, 0)),
-    extra_stop_fee: String(num($("#extra_stop_fee").value, 0)),
-  });
-  return p.toString();
-}
-
 function kvRow(label, value){
   return `
     <div class="kv">
@@ -95,54 +84,99 @@ function kvRow(label, value){
   `;
 }
 
-function applyResults(data){
-  // Accept multiple response shapes without breaking UI
+function readCalcInputs(){
+  return {
+    miles: num($("#miles").value, 0),
+    linehaul_rate: num($("#linehaul_rate").value, 0),
+    deadhead_miles: num($("#deadhead_miles").value, 0),
+    deadhead_rate: num($("#deadhead_rate").value, 0),
+    detention: num($("#detention").value, 0),
+    lumper_fee: num($("#lumper_fee").value, 0),
+    extra_stop_fee: num($("#extra_stop_fee").value, 0),
+  };
+}
+
+function buildQuery(obj){
+  const p = new URLSearchParams();
+  for(const [k,v] of Object.entries(obj)){
+    p.set(k, String(v));
+  }
+  return p.toString();
+}
+
+function normalizeResponse(data){
+  // Your API has evolved; this makes UI stable.
+  // Expected common shapes:
+  //  - { breakdown:{...}, fuel:{...}, ... }
+  //  - { total:..., fuel_total:..., linehaul_total:... }
+  //  - { breakdown:{ total, linehaul_total, deadhead_total, fuel_total, accessorials_total, subtotal } }
+
   const breakdown = data.breakdown || data.totals || data || {};
+  const fuelObj = data.fuel || {};
 
   const total =
-    data.total ?? breakdown.total ?? breakdown.grand_total ?? 0;
+    data.total ??
+    breakdown.total ??
+    breakdown.grand_total ??
+    0;
 
   const fuel =
-    (data.fuel && (data.fuel.fuel_total ?? data.fuel.total ?? data.fuel.est ?? 0)) ??
-    breakdown.fuel_total ?? breakdown.fuel ?? 0;
+    fuelObj.fuel_total ??
+    fuelObj.total ??
+    breakdown.fuel_total ??
+    breakdown.fuel ??
+    0;
 
   const linehaul =
-    breakdown.linehaul_total ?? breakdown.linehaul ?? 0;
+    breakdown.linehaul_total ??
+    breakdown.linehaul ??
+    0;
 
   const deadhead =
-    breakdown.deadhead_total ?? breakdown.deadhead ?? 0;
+    breakdown.deadhead_total ??
+    breakdown.deadhead ??
+    0;
 
   const accessorials =
-    breakdown.accessorials_total ?? breakdown.accessorials ?? 0;
+    breakdown.accessorials_total ??
+    breakdown.accessorials ??
+    0;
 
   const subtotal =
-    breakdown.subtotal ?? 0;
+    breakdown.subtotal ??
+    0;
 
-  $("#totalStat").textContent = money(total);
-  $("#fuelStat").textContent  = money(fuel);
+  return { total, fuel, linehaul, deadhead, accessorials, subtotal, raw:data };
+}
+
+function renderResults(data){
+  const n = normalizeResponse(data);
+
+  $("#totalStat").textContent = money(n.total);
+  $("#fuelStat").textContent  = money(n.fuel);
 
   const rows = [];
-  rows.push(kvRow("Linehaul", money(linehaul)));
-  rows.push(kvRow("Deadhead", money(deadhead)));
-  rows.push(kvRow("Fuel", money(fuel)));
-  if(num(accessorials,0) !== 0) rows.push(kvRow("Accessorials", money(accessorials)));
-  if(num(subtotal,0) !== 0) rows.push(kvRow("Subtotal", money(subtotal)));
+  rows.push(kvRow("Linehaul", money(n.linehaul)));
+  rows.push(kvRow("Deadhead", money(n.deadhead)));
+  rows.push(kvRow("Fuel", money(n.fuel)));
+  if(num(n.accessorials,0) !== 0) rows.push(kvRow("Accessorials", money(n.accessorials)));
+  if(num(n.subtotal,0) !== 0) rows.push(kvRow("Subtotal", money(n.subtotal)));
   rows.push(`<div class="divider"></div>`);
-  rows.push(kvRow("Total", money(total)));
+  rows.push(kvRow("Total", money(n.total)));
 
   $("#breakdown").innerHTML = rows.join("");
-
-  $("#raw").textContent = JSON.stringify(data, null, 2);
+  $("#raw").textContent = JSON.stringify(n.raw, null, 2);
 }
 
 async function doCalculate(){
   try{
-    setStatusPill("CALC_UI_v1_2026-01-17");
-    const data = await apiGet(`/calculate-rate?${buildQuery()}`);
-    applyResults(data);
+    setStatus("CALC_UI_v1_2026-01-17");
+    const q = buildQuery(readCalcInputs());
+    const data = await apiGet(`/calculate-rate?${q}`);
+    renderResults(data);
   }catch(err){
-    setStatusPill(`Calc failed: ${err.message}`);
-    // Keep layout, just show zeros
+    setStatus(`Calc failed: ${err.message}`);
+    // Keep the SAME formatted layout, just show zeros
     $("#totalStat").textContent = money(0);
     $("#fuelStat").textContent  = money(0);
     $("#breakdown").innerHTML = kvRow("Total", money(0));
@@ -151,32 +185,31 @@ async function doCalculate(){
 }
 
 async function doRegister(){
-  const u = ($("#reg_username")?.value || "").trim();
-  const p = ($("#reg_password")?.value || "").trim();
-  const r = $("#reg_role")?.value || "driver";
+  const u = ($("#reg_username").value || "").trim();
+  const p = ($("#reg_password").value || "").trim();
+  const r = $("#reg_role").value || "driver";
 
   if(!u || !p){
-    setStatusPill("Register failed: missing username/password");
+    setStatus("Register failed: missing username/password");
     return;
   }
 
   try{
     const data = await apiPost("/register", { username:u, password:p, role:r });
-    // Many backends return token on register; if not, user can login
     if(data?.token) setToken(data.token);
     setAuthBadge();
-    setStatusPill("Registered");
+    setStatus("Registered");
   }catch(err){
-    setStatusPill(`Register failed: ${err.message}`);
+    setStatus(`Register failed: ${err.message}`);
   }
 }
 
 async function doLogin(){
-  const u = ($("#login_username")?.value || "").trim();
-  const p = ($("#login_password")?.value || "").trim();
+  const u = ($("#login_username").value || "").trim();
+  const p = ($("#login_password").value || "").trim();
 
   if(!u || !p){
-    setStatusPill("Login failed: missing username/password");
+    setStatus("Login failed: missing username/password");
     return;
   }
 
@@ -185,19 +218,19 @@ async function doLogin(){
     if(data?.token){
       setToken(data.token);
       setAuthBadge();
-      setStatusPill("Logged in");
+      setStatus("Logged in");
     }else{
-      setStatusPill("Login failed: no token returned");
+      setStatus("Login failed: no token returned");
     }
   }catch(err){
-    setStatusPill(`Login failed: ${err.message}`);
+    setStatus(`Login failed: ${err.message}`);
   }
 }
 
 function doLogout(){
   clearToken();
   setAuthBadge();
-  setStatusPill("Logged out");
+  setStatus("Logged out");
 }
 
 function render(){
@@ -218,7 +251,7 @@ function render(){
         </div>
       </header>
 
-      <!-- AUTH (keep login/register on the page) -->
+      <!-- AUTH -->
       <section class="card">
         <div class="cardHeaderRow">
           <h2>Login</h2>
@@ -267,11 +300,10 @@ function render(){
         </div>
       </section>
 
-      <!-- CALCULATOR -->
+      <!-- CALCULATOR (2-column like your screenshot) -->
       <section class="card">
         <h2>Calculator</h2>
 
-        <!-- 2-column grid like your screenshot -->
         <div class="form2">
           <div class="field">
             <label>Miles</label>
@@ -325,7 +357,7 @@ function render(){
 
         <div class="resultsTitle">Results</div>
 
-        <!-- EXACT: two stat cards -->
+        <!-- Two stat cards (Total + Fuel est.) -->
         <div class="statGrid">
           <div class="stat">
             <div class="statLabel">Total</div>
@@ -338,7 +370,7 @@ function render(){
           </div>
         </div>
 
-        <!-- EXACT: breakdown rows (label left, value right) -->
+        <!-- Breakdown rows: label left, value right -->
         <div class="breakdown" id="breakdown">
           ${kvRow("Total", money(0))}
         </div>
@@ -348,8 +380,8 @@ function render(){
     </div>
   `;
 
-  // wire up buttons
   $("#calcBtn").addEventListener("click", doCalculate);
+
   $("#rawBtn").addEventListener("click", () => {
     const el = $("#raw");
     el.style.display = (el.style.display === "none") ? "block" : "none";
@@ -360,6 +392,7 @@ function render(){
   $("#logoutBtn").addEventListener("click", doLogout);
 
   setAuthBadge();
+  setStatus("CALC_UI_v1_2026-01-17");
 }
 
 document.addEventListener("DOMContentLoaded", render);
