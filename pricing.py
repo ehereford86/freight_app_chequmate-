@@ -1,57 +1,65 @@
-from fastapi import APIRouter, HTTPException
-from fuel import get_fuel_surcharge
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+
+from auth import get_current_user
+from fuel import fuel_surcharge
 
 router = APIRouter()
 
-@router.get(
-    "/calculate-rate",
-    description="Returns a full breakdown and includes national fuel surcharge per mile."
-)
+@router.get("/calculate-rate")
 def calculate_rate(
-    miles: float = 0,
-    linehaul_rate: float = 0,
-    deadhead_miles: float = 0,
-    deadhead_rate: float = 0,
-    detention: float = 0,
-    lumper_fee: float = 0,
-    extra_stop_fee: float = 0,
+    request: Request,
+    miles: float,
+    linehaul_rate: float,
+    deadhead_miles: float = 0.0,
+    deadhead_rate: float = 0.0,
+    detention: float = 0.0,
+    lumper_fee: float = 0.0,
+    extra_stop_fee: float = 0.0,
 ):
-    fuel = get_fuel_surcharge()
-    fs_per_mile = fuel.get("fuel_surcharge_per_mile")
+    try:
+        # Guest allowed; role info is returned for UI decisions
+        user = None
+        try:
+            user = get_current_user(request)
+        except Exception:
+            user = None
 
-    # If fuel lookup failed, do NOT crash with 500
-    if fs_per_mile is None:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Fuel surcharge unavailable: {fuel.get('error')}"
-        )
+        fuel = fuel_surcharge()
+        fpm = float(fuel.get("fuel_surcharge_per_mile") or 0.0)
 
-    # Core totals
-    linehaul_total = miles * linehaul_rate
-    deadhead_total = deadhead_miles * deadhead_rate
-    fuel_total = (miles + deadhead_miles) * float(fs_per_mile)
-    accessorials_total = detention + lumper_fee + extra_stop_fee
+        linehaul_total = miles * linehaul_rate
+        deadhead_total = deadhead_miles * deadhead_rate
+        accessorials_total = detention + lumper_fee + extra_stop_fee
+        fuel_total = miles * fpm
 
-    subtotal = linehaul_total + deadhead_total + fuel_total + accessorials_total
-    total = subtotal  # broker margin/fees removed for non-broker view
+        subtotal = linehaul_total + deadhead_total + accessorials_total
+        total = subtotal + fuel_total
 
-    return {
-        "inputs": {
-            "miles": miles,
-            "linehaul_rate": linehaul_rate,
-            "deadhead_miles": deadhead_miles,
-            "deadhead_rate": deadhead_rate,
-            "detention": detention,
-            "lumper_fee": lumper_fee,
-            "extra_stop_fee": extra_stop_fee,
-        },
-        "fuel": fuel,
-        "breakdown": {
-            "linehaul_total": round(linehaul_total, 2),
-            "deadhead_total": round(deadhead_total, 2),
-            "fuel_total": round(fuel_total, 2),
-            "accessorials_total": round(accessorials_total, 2),
-            "subtotal": round(subtotal, 2),
-            "total": round(total, 2),
+        return {
+            "inputs": {
+                "miles": miles,
+                "linehaul_rate": linehaul_rate,
+                "deadhead_miles": deadhead_miles,
+                "deadhead_rate": deadhead_rate,
+                "detention": detention,
+                "lumper_fee": lumper_fee,
+                "extra_stop_fee": extra_stop_fee,
+            },
+            "fuel": fuel,
+            "breakdown": {
+                "linehaul_total": linehaul_total,
+                "deadhead_total": deadhead_total,
+                "fuel_total": fuel_total,
+                "accessorials_total": accessorials_total,
+                "subtotal": subtotal,
+                "total": total,
+            },
+            "role_context": {
+                "logged_in": bool(user),
+                "role": (user["role"] if user else "guest"),
+                "broker_status": (user["broker_status"] if user else "none"),
+            }
         }
-    }
+    except Exception:
+        return JSONResponse(status_code=500, content={"detail": "Calculation failed"})

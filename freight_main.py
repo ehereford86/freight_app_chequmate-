@@ -3,27 +3,32 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-# -----------------------------
-# App setup
-# -----------------------------
+from db import init_db
+
 app = FastAPI(title="Freight App API", version="0.1.0")
 
 BASE_DIR = Path(__file__).resolve().parent
 WEBAPP_DIR = BASE_DIR / "webapp"
 
 # -----------------------------
+# Startup: init DB + seed admin (env-based)
+# -----------------------------
+@app.on_event("startup")
+def _startup():
+    init_db()
+
+# -----------------------------
 # No-cache middleware for UI assets
+# (prevents the "back to ugly / old JS" problem)
 # -----------------------------
 @app.middleware("http")
 async def no_cache_ui_assets(request, call_next):
     resp = await call_next(request)
-
     p = request.url.path
-    if p == "/app" or p.startswith("/webapp/"):
+    if p == "/app" or p.startswith("/webapp/") or p in ("/app.js", "/app.css"):
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         resp.headers["Pragma"] = "no-cache"
         resp.headers["Expires"] = "0"
-
     return resp
 
 # -----------------------------
@@ -37,6 +42,7 @@ def home():
 def home_head():
     return Response(status_code=200)
 
+# Platforms sometimes probe /app
 @app.head("/app")
 def app_head():
     return Response(status_code=200)
@@ -49,15 +55,11 @@ def app_ui():
     index_file = WEBAPP_DIR / "index.html"
     if not index_file.exists():
         return JSONResponse(status_code=404, content={"detail": "webapp/index.html not found"})
+    return FileResponse(index_file)
 
-    # FORCE the browser to render it as HTML (prevents "raw text" display)
-    return FileResponse(index_file, media_type="text/html; charset=utf-8")
-
-# Serve static assets:
-#   /webapp/app.css
-#   /webapp/app.js
-#   /webapp/assets/chequmate-logo.png
-app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR)), name="webapp")
+# Serve /webapp assets
+if WEBAPP_DIR.exists():
+    app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR)), name="webapp")
 
 # -----------------------------
 # API Routers

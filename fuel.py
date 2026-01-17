@@ -1,87 +1,60 @@
 import os
 import requests
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 router = APIRouter()
 
-EIA_BASE = "https://api.eia.gov/v2/petroleum/pri/gnd/data/"
-SERIES_DIESEL_US = "EMD_EPD2D_PTE_NUS_DPG"
-
-def get_fuel_surcharge(
-    api_key: str | None = None,
-    base_price: float = 1.25,
-    multiplier: float = 0.06,
-):
-    """
-    Returns a dict that ALWAYS contains:
-      - diesel_price (float|None)
-      - fuel_surcharge_per_mile (float|None)
-      - base_price (float)
-      - multiplier_used (float)
-      - source (str)
-      - error (str|None)   <-- present only on failure
-
-    Formula:
-      fs_per_mile = max(0, diesel_price - base_price) * multiplier
-    """
-    if api_key is None:
-        api_key = os.getenv("EIA_API_KEY", "").strip()
-
-    # If no env var exists, fallback to your current default key (keeps it working)
-    if not api_key:
-        api_key = "8TNeHiHQAm2CuZjIRiemysGRJlufFNEfkogwLDba"
-
-    params = {
-        "api_key": api_key,
-        "frequency": "weekly",
-        "data[0]": "value",
-        "facets[series][]": SERIES_DIESEL_US,
-        "sort[0][column]": "period",
-        "sort[0][direction]": "desc",
-        "length": 1,
-    }
-
-    source_url = (
-        f"{EIA_BASE}?api_key={api_key}"
-        f"&frequency=weekly&data[0]=value"
-        f"&facets[series][]={SERIES_DIESEL_US}"
-        f"&sort[0][column]=period&sort[0][direction]=desc&length=1"
-    )
-
-    try:
-        r = requests.get(EIA_BASE, params=params, timeout=10)
-        r.raise_for_status()
-        data = r.json()
-
-        diesel_str = data["response"]["data"][0]["value"]
-        diesel_price = float(diesel_str)
-
-        fs_per_mile = 0.0 if diesel_price <= base_price else (diesel_price - base_price) * multiplier
-
-        return {
-            "diesel_price": round(diesel_price, 3),
-            "fuel_surcharge_per_mile": round(fs_per_mile, 4),
-            "base_price": float(base_price),
-            "multiplier_used": float(multiplier),
-            "source": source_url,
-            "error": None,
-        }
-
-    except Exception as e:
-        # CRITICAL: still return the same keys so callers don't crash
-        return {
-            "diesel_price": None,
-            "fuel_surcharge_per_mile": None,
-            "base_price": float(base_price),
-            "multiplier_used": float(multiplier),
-            "source": source_url,
-            "error": str(e),
-        }
+EIA_API_KEY = os.getenv("EIA_API_KEY", "").strip()
 
 @router.get("/fuel-surcharge")
 def fuel_surcharge():
-    data = get_fuel_surcharge()
-    # Don’t throw 500; return a useful message if it failed
-    if data.get("fuel_surcharge_per_mile") is None:
-        raise HTTPException(status_code=502, detail=f"Fuel surcharge unavailable: {data.get('error')}")
-    return data
+    base_price = 1.25
+    multiplier = 0.06
+
+    if not EIA_API_KEY:
+        return {
+            "diesel_price": None,
+            "base_price": base_price,
+            "multiplier_used": multiplier,
+            "fuel_surcharge_per_mile": 0.0,
+            "error": "Missing EIA_API_KEY env var on server",
+            "source": None
+        }
+
+    try:
+        url = "https://api.eia.gov/v2/petroleum/pri/gnd/data/"
+        params = {
+            "api_key": EIA_API_KEY,
+            "frequency": "weekly",
+            "data[0]": "value",
+            "facets[series][]": "EMD_EPD2D_PTE_NUS_DPG",
+            "sort[0][column]": "period",
+            "sort[0][direction]": "desc",
+            "offset": 0,
+            "length": 1,
+        }
+        r = requests.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        j = r.json()
+        val = j["response"]["data"][0]["value"]
+        diesel = float(val)
+
+        per_mile = max(0.0, (diesel - base_price) * multiplier)
+
+        return {
+            "diesel_price": diesel,
+            "base_price": base_price,
+            "multiplier_used": multiplier,
+            "fuel_surcharge_per_mile": per_mile,
+            "error": None,
+            "source": "EIA"
+        }
+    except Exception:
+        return {
+            "diesel_price": None,
+            "base_price": base_price,
+            "multiplier_used": multiplier,
+            "fuel_surcharge_per_mile": 0.0,
+            "error": "No diesel price available",
+            "source": None
+        }
