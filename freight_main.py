@@ -13,13 +13,12 @@ WEBAPP_DIR = BASE_DIR / "webapp"
 
 # -----------------------------
 # No-cache middleware for UI assets
-# (prevents the "back to ugly / old JS" problem)
 # -----------------------------
 @app.middleware("http")
 async def no_cache_ui_assets(request, call_next):
     resp = await call_next(request)
-
     p = request.url.path
+
     if p == "/app" or p.startswith("/webapp/"):
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         resp.headers["Pragma"] = "no-cache"
@@ -38,7 +37,6 @@ def home():
 def home_head():
     return Response(status_code=200)
 
-# Optional: some platforms probe /app
 @app.head("/app")
 def app_head():
     return Response(status_code=200)
@@ -51,23 +49,15 @@ def app_ui():
     index_file = WEBAPP_DIR / "index.html"
     if not index_file.exists():
         return JSONResponse(status_code=404, content={"detail": "webapp/index.html not found"})
-    # Force correct rendering as HTML (prevents "source code shown on screen")
-    return FileResponse(index_file, media_type="text/html")
 
-# Also allow direct open for debugging
-@app.get("/webapp/index.html")
-def webapp_index():
-    index_file = WEBAPP_DIR / "index.html"
-    if not index_file.exists():
-        return JSONResponse(status_code=404, content={"detail": "webapp/index.html not found"})
-    return FileResponse(index_file, media_type="text/html")
+    # IMPORTANT: force correct HTML content-type so browsers render it
+    return FileResponse(index_file, media_type="text/html; charset=utf-8")
 
-# Serve static assets:
-#   /webapp/app.css
-#   /webapp/app.js
-#   /webapp/assets/chequmate-logo.png
-if WEBAPP_DIR.exists():
-    app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR)), name="webapp")
+# -----------------------------
+# Static assets
+# -----------------------------
+# Always mount /webapp (it’s fine if it’s empty locally; in deploy it will exist)
+app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR)), name="webapp")
 
 # -----------------------------
 # API Routers
