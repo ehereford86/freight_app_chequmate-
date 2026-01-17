@@ -34,7 +34,6 @@ async def no_cache_ui_assets(request, call_next):
 def home():
     return {"message": "Freight app API is running"}
 
-# Render/proxies may send HEAD /
 @app.head("/")
 def home_head():
     return Response(status_code=200)
@@ -52,22 +51,23 @@ def app_ui():
     index_file = WEBAPP_DIR / "index.html"
     if not index_file.exists():
         return JSONResponse(status_code=404, content={"detail": "webapp/index.html not found"})
+    # Force correct rendering as HTML (prevents "source code shown on screen")
+    return FileResponse(index_file, media_type="text/html")
 
-    # IMPORTANT: force correct content-type so browser renders HTML (not raw text)
+# Also allow direct open for debugging
+@app.get("/webapp/index.html")
+def webapp_index():
+    index_file = WEBAPP_DIR / "index.html"
+    if not index_file.exists():
+        return JSONResponse(status_code=404, content={"detail": "webapp/index.html not found"})
     return FileResponse(index_file, media_type="text/html")
 
 # Serve static assets:
 #   /webapp/app.css
 #   /webapp/app.js
 #   /webapp/assets/chequmate-logo.png
-#
-# IMPORTANT: mount unconditionally, and don't fail startup if the folder isn't present at import time.
-# (On Render, build/start timing can make conditional mounts flaky.)
-app.mount(
-    "/webapp",
-    StaticFiles(directory=str(WEBAPP_DIR), check_dir=False),
-    name="webapp",
-)
+if WEBAPP_DIR.exists():
+    app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR)), name="webapp")
 
 # -----------------------------
 # API Routers

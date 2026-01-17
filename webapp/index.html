@@ -1,54 +1,105 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title></title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="2685.2">
-  <style type="text/css">
-    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica}
-    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; min-height: 14.0px}
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chequmate</title>
+  <link rel="stylesheet" href="/webapp/app.css" />
 </head>
 <body>
-<p class="p1">&lt;!doctype html&gt;</p>
-<p class="p1">&lt;html lang="en"&gt;</p>
-<p class="p1">&lt;head&gt;</p>
-<p class="p1"><span class="Apple-converted-space">  </span>&lt;meta charset="utf-8" /&gt;</p>
-<p class="p1"><span class="Apple-converted-space">  </span>&lt;title&gt;Chequmate&lt;/title&gt;</p>
-<p class="p1"><span class="Apple-converted-space">  </span>&lt;meta name="viewport" content="width=device-width,initial-scale=1" /&gt;</p>
-<p class="p1"><span class="Apple-converted-space">  </span>&lt;link rel="stylesheet" href="/webapp/app.css" /&gt;</p>
-<p class="p1">&lt;/head&gt;</p>
-<p class="p1">&lt;body&gt;</p>
-<p class="p1"><span class="Apple-converted-space">  </span>&lt;div id="app"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;div class="container"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">      </span>&lt;h1&gt;Chequmate&lt;/h1&gt;</p>
-<p class="p1"><span class="Apple-converted-space">      </span>&lt;p&gt;Broker • Dispatcher • Driver&lt;/p&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">      </span>&lt;div class="card"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;h2&gt;Login&lt;/h2&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;input id="username" placeholder="Username" /&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;input id="password" type="password" placeholder="Password" /&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;button id="loginBtn"&gt;Login&lt;/button&gt;</p>
-<p class="p1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">      </span>&lt;div class="card"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;h2&gt;Register&lt;/h2&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;input id="reg_username" placeholder="Username" /&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;input id="reg_password" type="password" placeholder="Password" /&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;select id="reg_role"&gt;</p>
-<p class="p1"><span class="Apple-converted-space">          </span>&lt;option value="broker"&gt;Broker&lt;/option&gt;</p>
-<p class="p1"><span class="Apple-converted-space">          </span>&lt;option value="dispatcher"&gt;Dispatcher&lt;/option&gt;</p>
-<p class="p1"><span class="Apple-converted-space">          </span>&lt;option value="driver"&gt;Driver&lt;/option&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;/select&gt;</p>
-<p class="p1"><span class="Apple-converted-space">        </span>&lt;button id="registerBtn"&gt;Register&lt;/button&gt;</p>
-<p class="p1"><span class="Apple-converted-space">      </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</p>
-<p class="p1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</p>
-<p class="p2"><br></p>
-<p class="p1"><span class="Apple-converted-space">  </span>&lt;script src="/webapp/app.js"&gt;&lt;/script&gt;</p>
-<p class="p1">&lt;/body&gt;</p>
-<p class="p1">&lt;/html&gt;</p>
+  <div id="app" class="container">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>Freight App</h1>
+          <p class="muted">Broker · Dispatcher · Driver</p>
+        </div>
+      </div>
+      <div class="pill" id="sessionPill">Not logged in</div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Login</h2>
+        <label>Username</label>
+        <input id="login_username" placeholder="Username" autocomplete="username" />
+        <label>Password</label>
+        <input id="login_password" type="password" placeholder="Password" autocomplete="current-password" />
+        <button id="loginBtn" class="btn">Login</button>
+        <div id="loginMsg" class="msg"></div>
+      </section>
+
+      <section class="card">
+        <h2>Register</h2>
+        <label>Username</label>
+        <input id="reg_username" placeholder="Username" autocomplete="username" />
+        <label>Password</label>
+        <input id="reg_password" type="password" placeholder="Password" autocomplete="new-password" />
+
+        <label>Role</label>
+        <select id="reg_role">
+          <option value="broker">Broker</option>
+          <option value="dispatcher">Dispatcher</option>
+          <option value="driver">Driver</option>
+        </select>
+
+        <button id="registerBtn" class="btn btn2">Create account</button>
+        <div id="regMsg" class="msg"></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Calculator</h2>
+      <p class="muted">This part can be locked behind login later. For now it stays available so you can test the API fast.</p>
+
+      <div class="row">
+        <div>
+          <label>Miles</label>
+          <input id="miles" type="number" value="650" />
+        </div>
+        <div>
+          <label>Linehaul rate ($/mile)</label>
+          <input id="linehaul_rate" type="number" step="0.01" value="3.00" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Deadhead miles</label>
+          <input id="deadhead_miles" type="number" value="75" />
+        </div>
+        <div>
+          <label>Deadhead rate ($/mile)</label>
+          <input id="deadhead_rate" type="number" step="0.01" value="0" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Detention ($)</label>
+          <input id="detention" type="number" step="0.01" value="0" />
+        </div>
+        <div>
+          <label>Lumper fee ($)</label>
+          <input id="lumper_fee" type="number" step="0.01" value="0" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Extra stop fee ($)</label>
+          <input id="extra_stop_fee" type="number" step="0.01" value="0" />
+        </div>
+      </div>
+
+      <button id="calcBtn" class="btn">Calculate</button>
+
+      <h3>Output</h3>
+      <pre id="output" class="output">Ready.</pre>
+    </section>
+  </div>
+
+  <script src="/webapp/app.js"></script>
 </body>
 </html>
