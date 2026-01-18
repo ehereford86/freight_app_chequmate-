@@ -36,7 +36,7 @@ def _add_col_if_missing(con: sqlite3.Connection, table: str, name: str, sqltype:
 
 def init_db() -> None:
     with _conn() as con:
-        # Base schema (keep compatible with existing DBs)
+        # Users
         con.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +47,7 @@ def init_db() -> None:
         )
         """)
 
+        # Password resets
         con.execute("""
         CREATE TABLE IF NOT EXISTS password_resets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,6 +55,18 @@ def init_db() -> None:
             token TEXT NOT NULL,
             expires_at TEXT NOT NULL,
             created_at TEXT NOT NULL
+        )
+        """)
+
+        # Broker approval requests
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS broker_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            broker_mc TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         )
         """)
 
@@ -74,8 +87,7 @@ def create_user(username: str, password_hash: str, role: str, broker_mc: Optiona
 
 def get_user(username: str):
     with _conn() as con:
-        row = con.execute("SELECT * FROM users WHERE username = ? LIMIT 1", (username,)).fetchone()
-        return row
+        return con.execute("SELECT * FROM users WHERE username = ? LIMIT 1", (username,)).fetchone()
 
 def set_password(username: str, password_hash: str) -> None:
     with _conn() as con:
@@ -85,6 +97,39 @@ def set_password(username: str, password_hash: str) -> None:
 def set_email(username: str, email: str) -> None:
     with _conn() as con:
         con.execute("UPDATE users SET email = ? WHERE username = ?", (email, username))
+        con.commit()
+
+def set_role(username: str, role: str) -> None:
+    with _conn() as con:
+        con.execute("UPDATE users SET role = ? WHERE username = ?", (role, username))
+        con.commit()
+
+def set_broker_status(username: str, status: str) -> None:
+    with _conn() as con:
+        con.execute("UPDATE users SET broker_status = ? WHERE username = ?", (status, username))
+        con.commit()
+
+def create_broker_request(username: str, broker_mc: str) -> None:
+    with _conn() as con:
+        con.execute(
+            "INSERT INTO broker_requests (username, broker_mc, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (username, broker_mc, "pending", now_iso(), now_iso()),
+        )
+        con.commit()
+
+def list_broker_requests(status: str = "pending"):
+    with _conn() as con:
+        return con.execute(
+            "SELECT * FROM broker_requests WHERE status = ? ORDER BY id DESC",
+            (status,),
+        ).fetchall()
+
+def set_broker_request_status(req_id: int, status: str) -> None:
+    with _conn() as con:
+        con.execute(
+            "UPDATE broker_requests SET status = ?, updated_at = ? WHERE id = ?",
+            (status, now_iso(), int(req_id)),
+        )
         con.commit()
 
 def create_reset(username: str, token: str, expires_at_iso: str) -> None:

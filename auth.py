@@ -18,11 +18,14 @@ JWT_EXPIRE_MIN = int(db.get_env("JWT_EXPIRE_MIN", "43200"))  # 30 days default
 
 ROLES = {"driver", "dispatcher", "broker", "admin"}
 
+
 def hash_password(pw: str) -> str:
     return pwd_context.hash(pw)
 
+
 def verify_password(pw: str, pw_hash: str) -> bool:
     return pwd_context.verify(pw, pw_hash)
+
 
 def make_token(payload: dict) -> str:
     exp = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRE_MIN)
@@ -30,8 +33,10 @@ def make_token(payload: dict) -> str:
     data["exp"] = exp
     return jwt.encode(data, JWT_SECRET, algorithm=JWT_ALG)
 
+
 def decode_token(token: str) -> dict:
     return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+
 
 def _bearer_token(request: Request) -> str | None:
     h = request.headers.get("authorization") or request.headers.get("Authorization")
@@ -41,6 +46,7 @@ def _bearer_token(request: Request) -> str | None:
         return None
     return h.split(" ", 1)[1].strip()
 
+
 async def read_json(request: Request) -> dict:
     try:
         if request.headers.get("content-type", "").startswith("application/json"):
@@ -49,18 +55,26 @@ async def read_json(request: Request) -> dict:
         pass
     return {}
 
+
 def seed_admin_if_needed():
-    admin_user = db.get_env("ADMIN_USERNAME", "").strip()
-    admin_pass = db.get_env("ADMIN_PASSWORD", "").strip()
+    admin_user = (db.get_env("ADMIN_USERNAME", "") or "").strip()
+    admin_pass = (db.get_env("ADMIN_PASSWORD", "") or "").strip()
     if not admin_user or not admin_pass:
         return
 
     u = db.get_user(admin_user)
     if not u:
-        db.create_user(admin_user, hash_password(admin_pass), role="admin", broker_mc=None, broker_status="approved")
+        db.create_user(
+            admin_user,
+            hash_password(admin_pass),
+            role="admin",
+            broker_mc=None,
+            broker_status="approved",
+        )
     else:
         if u["role"] != "admin":
             db.set_role(admin_user, "admin")
+
 
 def get_current_user(request: Request):
     token = _bearer_token(request)
@@ -75,20 +89,30 @@ def get_current_user(request: Request):
     except JWTError:
         return None
 
+
+def get_current_user_optional(request: Request):
+    # Dependency-friendly alias used by other modules
+    return get_current_user(request)
+
+
 def require_user(request: Request):
     u = get_current_user(request)
     if not u:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return u
 
+
 def require_role(*allowed_roles: str):
     allowed = set(allowed_roles)
+
     def _dep(request: Request):
         u = require_user(request)
         if u["role"] not in allowed:
             raise HTTPException(status_code=403, detail="Forbidden")
         return u
+
     return _dep
+
 
 @router.get("/verify-token")
 def verify_token(request: Request):
@@ -103,6 +127,7 @@ def verify_token(request: Request):
         "broker_mc": u["broker_mc"],
     }
 
+
 # ---- LOGIN ----
 @router.get("/login")
 def login_get(username: str, password: str):
@@ -111,6 +136,7 @@ def login_get(username: str, password: str):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = make_token({"username": u["username"], "role": u["role"]})
     return {"ok": True, "token": token, "role": u["role"], "broker_status": u["broker_status"]}
+
 
 @router.post("/login")
 async def login_post(request: Request):
@@ -126,6 +152,7 @@ async def login_post(request: Request):
 
     token = make_token({"username": u["username"], "role": u["role"]})
     return {"ok": True, "token": token, "role": u["role"], "broker_status": u["broker_status"]}
+
 
 # ---- REGISTER ----
 @router.get("/register")
@@ -143,12 +170,13 @@ def register_get(username: str, password: str, role: str = "driver", broker_mc: 
         if not broker_mc:
             raise HTTPException(status_code=400, detail="Broker MC# required")
         broker_status = "pending"
-        db.create_user(username, hash_password(password), role=role, broker_mc=boker_mc if False else broker_mc, broker_status=broker_status)
+        db.create_user(username, hash_password(password), role=role, broker_mc=broker_mc, broker_status=broker_status)
         db.create_broker_request(username, broker_mc)
     else:
         db.create_user(username, hash_password(password), role=role, broker_mc=None, broker_status=broker_status)
 
     return {"ok": True, "message": "Registered"}
+
 
 @router.post("/register")
 async def register_post(request: Request):
@@ -177,11 +205,13 @@ async def register_post(request: Request):
 
     return {"ok": True, "message": "Registered"}
 
+
 # ---- ADMIN: broker approval ----
 @router.get("/admin/list-broker-requests")
-def admin_list_brokers(request: Request, status: str = "pending", u=Depends(require_role("admin"))):
+def admin_list_brokers(status: str = "pending", u=Depends(require_role("admin"))):
     rows = db.list_broker_requests(status=status)
     return {"ok": True, "requests": [dict(r) for r in rows]}
+
 
 @router.post("/admin/approve-broker")
 async def admin_approve(request: Request, u=Depends(require_role("admin"))):
@@ -189,13 +219,14 @@ async def admin_approve(request: Request, u=Depends(require_role("admin"))):
     req_id = body.get("id")
     if req_id is None:
         raise HTTPException(status_code=400, detail="Missing id")
-    db.set_broker_request_status(int(req_id), "approved")
 
+    db.set_broker_request_status(int(req_id), "approved")
     with db._conn() as con:
         r = con.execute("SELECT username FROM broker_requests WHERE id = ?", (int(req_id),)).fetchone()
     if r:
         db.set_broker_status(r["username"], "approved")
     return {"ok": True}
+
 
 @router.post("/admin/reject-broker")
 async def admin_reject(request: Request, u=Depends(require_role("admin"))):
@@ -203,22 +234,25 @@ async def admin_reject(request: Request, u=Depends(require_role("admin"))):
     req_id = body.get("id")
     if req_id is None:
         raise HTTPException(status_code=400, detail="Missing id")
-    db.set_broker_request_status(int(req_id), "rejected")
 
+    db.set_broker_request_status(int(req_id), "rejected")
     with db._conn() as con:
         r = con.execute("SELECT username FROM broker_requests WHERE id = ?", (int(req_id),)).fetchone()
     if r:
         db.set_broker_status(r["username"], "rejected")
     return {"ok": True}
 
-# ---- Password reset placeholders (email sending later) ----
+
+# ---- Password reset (email comes next phase) ----
 @router.post("/password-reset/request")
 async def password_reset_request(request: Request):
     body = await read_json(request)
     username = (body.get("username") or "").strip()
     if not username:
         raise HTTPException(status_code=400, detail="Missing username")
+
     u = db.get_user(username)
+    # Always respond generically so we don't leak whether the user exists
     if not u:
         return {"ok": True, "message": "If the user exists, a reset was created."}
 
@@ -226,7 +260,9 @@ async def password_reset_request(request: Request):
     expires_at = datetime.now(timezone.utc) + timedelta(hours=2)
     db.create_reset(username, token, expires_at.isoformat())
 
+    # For now we return token (dev/testing). Next phase: email it.
     return {"ok": True, "token": token, "expires_at": expires_at.isoformat()}
+
 
 @router.post("/password-reset/confirm")
 async def password_reset_confirm(request: Request):

@@ -1,22 +1,13 @@
-# fuel.py
 import os
 import requests
 from fastapi import APIRouter, HTTPException, Header
 
 router = APIRouter()
 
-
 def _debug_enabled() -> bool:
     return os.environ.get("ENABLE_DEBUG_ROUTES", "0").strip() == "1"
 
-
 def _require_debug_token(x_debug_token: str | None) -> None:
-    """
-    Debug routes require:
-      ENABLE_DEBUG_ROUTES=1
-      DEBUG_ADMIN_TOKEN set
-      Header: X-Debug-Token: <DEBUG_ADMIN_TOKEN>
-    """
     if not _debug_enabled():
         raise HTTPException(status_code=404, detail="Not Found")
 
@@ -27,22 +18,14 @@ def _require_debug_token(x_debug_token: str | None) -> None:
     if not x_debug_token or x_debug_token.strip() != secret:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-
 def _mask(s: str, keep: int = 4) -> str:
-    """Mask secrets for debug output."""
     if not s:
         return ""
     if len(s) <= keep:
         return "*" * len(s)
     return ("*" * (len(s) - keep)) + s[-keep:]
 
-
 def get_diesel_price():
-    """
-    Fetch diesel price from EIA.
-    Returns:
-      (diesel_price_float_or_None, meta_dict)
-    """
     api_key = os.environ.get("EIA_API_KEY", "")
     if not api_key:
         return None, {
@@ -101,10 +84,8 @@ def get_diesel_price():
             "url": url,
         }
 
-
 @router.get("/_debug/eia", include_in_schema=False)
 def debug_eia(x_debug_token: str | None = Header(default=None, alias="X-Debug-Token")):
     _require_debug_token(x_debug_token)
-
     price, meta = get_diesel_price()
     return {"diesel_price": price, "meta": meta}

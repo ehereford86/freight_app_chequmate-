@@ -25,14 +25,6 @@ def calculate_rate(
     extra_stop_fee: float = 0.0,
     user=Depends(get_current_user_optional),
 ):
-    """
-    GET /calculate-rate
-    Returns:
-      - inputs
-      - fuel breakdown (using EIA diesel price if available)
-      - totals breakdown
-      - role context
-    """
     try:
         miles = _to_float(miles, 0.0)
         linehaul_rate = _to_float(linehaul_rate, 0.0)
@@ -42,21 +34,17 @@ def calculate_rate(
         lumper_fee = _to_float(lumper_fee, 0.0)
         extra_stop_fee = _to_float(extra_stop_fee, 0.0)
 
-        # Linehaul + deadhead
         linehaul_total = miles * linehaul_rate
         deadhead_total = deadhead_miles * deadhead_rate
-
-        # Accessorials
         accessorials_total = detention + lumper_fee + extra_stop_fee
 
-        # Fuel surcharge per mile (use same logic as fuel.py)
         base_price = 1.25
         multiplier = 0.06
 
         diesel_price, meta = fuel.get_diesel_price()
         if diesel_price is None:
             per_mile = 0.0
-            fuel_error = "No diesel price available (check EIA_API_KEY)"
+            fuel_error = "No diesel price available"
             fuel_source = None
         else:
             per_mile = max(0.0, (float(diesel_price) - base_price) * multiplier)
@@ -64,7 +52,6 @@ def calculate_rate(
             fuel_source = "EIA"
 
         fuel_total = miles * per_mile
-
         subtotal = linehaul_total + deadhead_total + accessorials_total
         total = subtotal + fuel_total
 
@@ -85,7 +72,6 @@ def calculate_rate(
                 "fuel_surcharge_per_mile": per_mile,
                 "error": fuel_error,
                 "source": fuel_source,
-                "meta": meta,
             },
             "breakdown": {
                 "linehaul_total": linehaul_total,
@@ -98,7 +84,7 @@ def calculate_rate(
             "role_context": {
                 "logged_in": bool(user),
                 "role": (user["role"] if user else "guest"),
-                "broker_status": (user.get("broker_status") if user else "none"),
+                "broker_status": (user["broker_status"] if user else "none"),
             },
         }
     except HTTPException:
