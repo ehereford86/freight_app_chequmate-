@@ -1,6 +1,10 @@
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-requests==2.32.3
-python-jose==3.3.0
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Auth + hashing
 passlib[bcrypt]==1.7.4
-bcrypt==4.1.3
+bcrypt==3.2.2
+python-jose==3.3.0
+
+# HTTP
+requests==2.32.3

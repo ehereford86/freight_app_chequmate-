@@ -1,75 +1,87 @@
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
-from db import init_db
+import db
+
+APP_DIR = Path(__file__).resolve().parent
+WEBAPP_DIR = APP_DIR / "webapp"
+INDEX_FILE = WEBAPP_DIR / "index.html"
 
 app = FastAPI(title="Freight App API", version="0.1.0")
 
-BASE_DIR = Path(__file__).resolve().parent
-WEBAPP_DIR = BASE_DIR / "webapp"
-
 # -----------------------------
-# Startup: init DB + seed admin (env-based)
+# Startup
 # -----------------------------
 @app.on_event("startup")
 def _startup():
-    init_db()
+    # init DB
+    try:
+        if hasattr(db, "init_db"):
+            db.init_db()
+    except Exception:
+        pass
+
+    # seed admin (optional; doesn't crash if function missing)
+    try:
+        import auth
+        if hasattr(auth, "seed_admin_if_needed"):
+            auth.seed_admin_if_needed()
+    except Exception:
+        pass
 
 # -----------------------------
-# No-cache middleware for UI assets
-# (prevents the "back to ugly / old JS" problem)
+# Basic endpoints
 # -----------------------------
-@app.middleware("http")
-async def no_cache_ui_assets(request, call_next):
-    resp = await call_next(request)
-    p = request.url.path
-    if p == "/app" or p.startswith("/webapp/") or p in ("/app.js", "/app.css"):
-        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        resp.headers["Pragma"] = "no-cache"
-        resp.headers["Expires"] = "0"
-    return resp
-
-# -----------------------------
-# Health / Root
-# -----------------------------
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def home():
     return {"message": "Freight app API is running"}
 
-@app.head("/")
-def home_head():
-    return Response(status_code=200)
-
-# Platforms sometimes probe /app
-@app.head("/app")
-def app_head():
-    return Response(status_code=200)
-
-# -----------------------------
-# Web UI
-# -----------------------------
-@app.get("/app")
+# UI
+@app.get("/app", include_in_schema=False)
 def app_ui():
-    index_file = WEBAPP_DIR / "index.html"
-    if not index_file.exists():
-        return JSONResponse(status_code=404, content={"detail": "webapp/index.html not found"})
-    return FileResponse(index_file)
+    if INDEX_FILE.exists():
+        return HTMLResponse(INDEX_FILE.read_text(encoding="utf-8"))
+    return HTMLResponse("<h1>UI not found</h1>", status_code=404)
 
 # Serve /webapp assets
 if WEBAPP_DIR.exists():
     app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR)), name="webapp")
 
+# Optional convenience routes (if your UI ever hits /app.js or /app.css)
+@app.get("/app.js", include_in_schema=False)
+def app_js():
+    f = WEBAPP_DIR / "app.js"
+    if f.exists():
+        return HTMLResponse(f.read_text(encoding="utf-8"), media_type="text/javascript")
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
+
+@app.get("/app.css", include_in_schema=False)
+def app_css():
+    f = WEBAPP_DIR / "app.css"
+    if f.exists():
+        return HTMLResponse(f.read_text(encoding="utf-8"), media_type="text/css")
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
+
 # -----------------------------
-# API Routers
+# API Routers (THIS IS THE FIX)
 # -----------------------------
-for mod_name in ("auth", "fuel", "pricing", "fmcsa"):
+def _safe_include(module_name: str):
     try:
-        module = __import__(mod_name)
+        module = __import__(module_name)
         router = getattr(module, "router", None)
         if router is not None:
             app.include_router(router)
+            return True
     except Exception:
-        # Don't crash if a router import fails
-        pass
+        return False
+    return False
+
+# Must-have routers
+_safe_include("auth")
+_safe_include("pricing")
+
+# Optional routers if present
+_safe_include("fuel")
+_safe_include("fmcsa")

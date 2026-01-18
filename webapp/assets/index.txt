@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chequmate Freight</title>
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="/webapp/app.css" />
+</head>
+<body>
+  <noscript class="noscript">
+    This app requires JavaScript to run.
+  </noscript>
+
+  <!-- App root (JS renders everything here) -->
+  <div id="app"></div>
+
+  <!-- App logic -->
+  <script src="/webapp/app.js"></script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -41,17 +42,10 @@ def _bearer_token(request: Request) -> str | None:
         return None
     return h.split(" ", 1)[1].strip()
 
-async def read_json(request: Request) -> dict:
-    try:
-        if request.headers.get("content-type", "").startswith("application/json"):
-            return await request.json()
-    except Exception:
-        pass
-    return {}
-
 def seed_admin_if_needed():
     admin_user = db.get_env("ADMIN_USERNAME", "").strip()
     admin_pass = db.get_env("ADMIN_PASSWORD", "").strip()
+    admin_email = db.get_env("ADMIN_EMAIL", "").strip()  # optional (for future)
     if not admin_user or not admin_pass:
         return
 
@@ -59,6 +53,7 @@ def seed_admin_if_needed():
     if not u:
         db.create_user(admin_user, hash_password(admin_pass), role="admin", broker_mc=None, broker_status="approved")
     else:
+        # Ensure role is admin; do not overwrite password automatically
         if u["role"] != "admin":
             db.set_role(admin_user, "admin")
 
@@ -90,6 +85,19 @@ def require_role(*allowed_roles: str):
         return u
     return _dep
 
+def _read_body_json(request: Request) -> dict:
+    # If client posts JSON, we accept it; otherwise empty dict
+    return request.state.json_body if hasattr(request.state, "json_body") else {}
+
+@router.middleware("http")
+async def capture_json_body(request: Request, call_next):
+    try:
+        if request.headers.get("content-type", "").startswith("application/json"):
+            request.state.json_body = await request.json()
+    except Exception:
+        request.state.json_body = {}
+    return await call_next(request)
+
 @router.get("/verify-token")
 def verify_token(request: Request):
     u = get_current_user(request)
@@ -113,8 +121,8 @@ def login_get(username: str, password: str):
     return {"ok": True, "token": token, "role": u["role"], "broker_status": u["broker_status"]}
 
 @router.post("/login")
-async def login_post(request: Request):
-    body = await read_json(request)
+def login_post(request: Request):
+    body = _read_body_json(request)
     username = (body.get("username") or "").strip()
     password = (body.get("password") or "").strip()
     if not username or not password:
@@ -143,7 +151,7 @@ def register_get(username: str, password: str, role: str = "driver", broker_mc: 
         if not broker_mc:
             raise HTTPException(status_code=400, detail="Broker MC# required")
         broker_status = "pending"
-        db.create_user(username, hash_password(password), role=role, broker_mc=boker_mc if False else broker_mc, broker_status=broker_status)
+        db.create_user(username, hash_password(password), role=role, broker_mc=broker_mc, broker_status=broker_status)
         db.create_broker_request(username, broker_mc)
     else:
         db.create_user(username, hash_password(password), role=role, broker_mc=None, broker_status=broker_status)
@@ -151,8 +159,8 @@ def register_get(username: str, password: str, role: str = "driver", broker_mc: 
     return {"ok": True, "message": "Registered"}
 
 @router.post("/register")
-async def register_post(request: Request):
-    body = await read_json(request)
+def register_post(request: Request):
+    body = _read_body_json(request)
     username = (body.get("username") or "").strip()
     password = (body.get("password") or "").strip()
     role = (body.get("role") or "driver").lower().strip()
@@ -184,13 +192,14 @@ def admin_list_brokers(request: Request, status: str = "pending", u=Depends(requ
     return {"ok": True, "requests": [dict(r) for r in rows]}
 
 @router.post("/admin/approve-broker")
-async def admin_approve(request: Request, u=Depends(require_role("admin"))):
-    body = await read_json(request)
+def admin_approve(request: Request, u=Depends(require_role("admin"))):
+    body = _read_body_json(request)
     req_id = body.get("id")
     if req_id is None:
         raise HTTPException(status_code=400, detail="Missing id")
     db.set_broker_request_status(int(req_id), "approved")
 
+    # also mark user approved
     with db._conn() as con:
         r = con.execute("SELECT username FROM broker_requests WHERE id = ?", (int(req_id),)).fetchone()
     if r:
@@ -198,13 +207,12 @@ async def admin_approve(request: Request, u=Depends(require_role("admin"))):
     return {"ok": True}
 
 @router.post("/admin/reject-broker")
-async def admin_reject(request: Request, u=Depends(require_role("admin"))):
-    body = await read_json(request)
+def admin_reject(request: Request, u=Depends(require_role("admin"))):
+    body = _read_body_json(request)
     req_id = body.get("id")
     if req_id is None:
         raise HTTPException(status_code=400, detail="Missing id")
     db.set_broker_request_status(int(req_id), "rejected")
-
     with db._conn() as con:
         r = con.execute("SELECT username FROM broker_requests WHERE id = ?", (int(req_id),)).fetchone()
     if r:
@@ -213,24 +221,26 @@ async def admin_reject(request: Request, u=Depends(require_role("admin"))):
 
 # ---- Password reset placeholders (email sending later) ----
 @router.post("/password-reset/request")
-async def password_reset_request(request: Request):
-    body = await read_json(request)
+def password_reset_request(request: Request):
+    body = _read_body_json(request)
     username = (body.get("username") or "").strip()
     if not username:
         raise HTTPException(status_code=400, detail="Missing username")
     u = db.get_user(username)
     if not u:
+        # don't leak existence
         return {"ok": True, "message": "If the user exists, a reset was created."}
 
     token = secrets.token_urlsafe(24)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=2)
     db.create_reset(username, token, expires_at.isoformat())
 
+    # For now: return token (dev). In production you email it.
     return {"ok": True, "token": token, "expires_at": expires_at.isoformat()}
 
 @router.post("/password-reset/confirm")
-async def password_reset_confirm(request: Request):
-    body = await read_json(request)
+def password_reset_confirm(request: Request):
+    body = _read_body_json(request)
     username = (body.get("username") or "").strip()
     token = (body.get("token") or "").strip()
     new_password = (body.get("new_password") or "").strip()

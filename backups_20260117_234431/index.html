@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Freight App</title>
+
+  <!-- Mobile / responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="/webapp/app.css" />
+</head>
+
+<body>
+  <div class="page">
+    <!-- Header -->
+    <div class="topbar">
+      <div class="brand">
+        <img class="brandLogo" src="/webapp/assets/chequmate-logo.png" alt="Chequmate" onerror="this.style.display='none'">
+        <div class="brandText">
+          <div class="brandTitle">Freight App</div>
+          <div class="brandSub">Calculator · Dispatcher · Driver testing UI</div>
+        </div>
+      </div>
+
+      <div class="topRight">
+        <div id="statusPill" class="pill">Not logged in</div>
+        <div class="pill muted" id="buildTag">CALC_UI_v1_2026-01-17</div>
+      </div>
+    </div>
+
+    <!-- Auth row -->
+    <div class="grid2">
+      <!-- Login -->
+      <div class="card">
+        <div class="cardTitle">Login</div>
+
+        <label class="label">Username</label>
+        <input id="loginUser" class="input" type="text" autocomplete="username" />
+
+        <label class="label">Password</label>
+        <input id="loginPass" class="input" type="password" autocomplete="current-password" />
+
+        <div class="row">
+          <button id="btnLogin" class="btn primary">Login</button>
+          <button id="btnLogout" class="btn ghost">Logout</button>
+        </div>
+
+        <div id="loginMsg" class="msg"></div>
+      </div>
+
+      <!-- Register -->
+      <div class="card">
+        <div class="cardTitle">Register</div>
+
+        <label class="label">Username</label>
+        <input id="regUser" class="input" type="text" autocomplete="username" />
+
+        <label class="label">Password</label>
+        <input id="regPass" class="input" type="password" autocomplete="new-password" />
+
+        <label class="label">Role</label>
+        <select id="regRole" class="input">
+          <option value="broker">Broker</option>
+          <option value="dispatcher">Dispatcher</option>
+          <option value="driver">Driver</option>
+        </select>
+
+        <button id="btnRegister" class="btn primary">Register</button>
+
+        <div id="regMsg" class="msg"></div>
+        <div class="hint">Brokers may require admin approval before full access.</div>
+      </div>
+    </div>
+
+    <!-- Calculator -->
+    <div class="card">
+      <div class="cardTitle">Calculator</div>
+
+      <div class="grid2">
+        <div>
+          <label class="label">Miles</label>
+          <input id="miles" class="input" type="number" step="0.01" value="1375" />
+
+          <label class="label">Deadhead miles</label>
+          <input id="deadhead_miles" class="input" type="number" step="0.01" value="75" />
+
+          <label class="label">Detention ($)</label>
+          <input id="detention" class="input" type="number" step="0.01" value="0" />
+
+          <label class="label">Extra stop ($)</label>
+          <input id="extra_stop_fee" class="input" type="number" step="0.01" value="0" />
+        </div>
+
+        <div>
+          <label class="label">Linehaul rate ($/mile)</label>
+          <input id="linehaul_rate" class="input" type="number" step="0.01" value="3.00" />
+
+          <label class="label">Deadhead rate ($/mile)</label>
+          <input id="deadhead_rate" class="input" type="number" step="0.01" value="0" />
+
+          <label class="label">Lumper ($)</label>
+          <input id="lumper_fee" class="input" type="number" step="0.01" value="0" />
+
+          <label class="label">Fuel surcharge (auto)</label>
+          <div class="input readonly" id="fuelMode">Auto from EIA</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <button id="btnCalc" class="btn primary">Calculate</button>
+        <button id="btnRaw" class="btn ghost">Show raw JSON</button>
+        <div id="calcMsg" class="msg inline"></div>
+      </div>
+
+      <div class="hint">
+        Tip: If fuel is unavailable, totals still calculate — fuel shows $0 and an explanation.
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card">
+      <div class="cardTitle">Results</div>
+
+      <div class="grid2">
+        <div class="miniCard">
+          <div class="miniLabel">Total</div>
+          <div class="miniValue" id="outTotal">$0.00</div>
+        </div>
+
+        <div class="miniCard">
+          <div class="miniLabel">Fuel (est.)</div>
+          <div class="miniValue" id="outFuel">$0.00</div>
+        </div>
+      </div>
+
+      <div class="breakdown">
+        <div class="line">
+          <div class="k">Linehaul</div>
+          <div class="v" id="outLinehaul">$0.00</div>
+        </div>
+        <div class="line">
+          <div class="k">Deadhead</div>
+          <div class="v" id="outDeadhead">$0.00</div>
+        </div>
+        <div class="line">
+          <div class="k">Fuel</div>
+          <div class="v" id="outFuel2">$0.00</div>
+        </div>
+        <div class="line">
+          <div class="k">Accessorials</div>
+          <div class="v" id="outAccessorials">$0.00</div>
+        </div>
+        <div class="line thin"></div>
+        <div class="line">
+          <div class="k">Subtotal</div>
+          <div class="v" id="outSubtotal">$0.00</div>
+        </div>
+      </div>
+
+      <div id="rawWrap" class="rawWrap hidden">
+        <pre id="rawBox" class="rawBox">{}</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- App logic -->
+  <script src="/webapp/app.js"></script>
+</body>
+</html>

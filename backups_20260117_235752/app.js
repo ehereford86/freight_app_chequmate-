@@ -35,25 +35,6 @@ async function postJSON(path, body, token=""){
   return data;
 }
 
-async function getJSON(path, token=""){
-  const headers = {};
-  if(token) headers["Authorization"] = `Bearer ${token}`;
-
-  const r = await fetch(API_BASE + path, {
-    method: "GET",
-    headers,
-  });
-
-  let data = null;
-  try { data = await r.json(); } catch(e){}
-
-  if(!r.ok){
-    const detail = (data && (data.detail || data.message)) ? (data.detail || data.message) : `HTTP ${r.status}`;
-    throw new Error(detail);
-  }
-  return data;
-}
-
 // --- AUTH ---
 async function doLogin(){
   setMsg("#loginMsg", "");
@@ -62,7 +43,8 @@ async function doLogin(){
     const password = ($("#loginPass")?.value || "").trim();
     if(!username || !password) throw new Error("Enter username + password");
 
-    // NOTE: if your backend login is GET-only, change this to getJSON(`/login?username=...&password=...`)
+    // Your API currently exposes /login (looks like GET in your earlier openapi list),
+    // but we’ll call POST first (safer). If it fails, you can adjust to GET later.
     const data = await postJSON("/login", { username, password });
 
     if(!data || !data.token) throw new Error("No token returned");
@@ -93,7 +75,6 @@ async function doRegister(){
     if(password.length < 8) throw new Error("Password must be at least 8 characters");
     if(role === "broker" && !mc_number) throw new Error("Broker MC# is required");
 
-    // NOTE: if your backend register is GET-only, change this to getJSON(`/register?...`)
     const data = await postJSON("/register", { username, password, role, mc_number });
     setMsg("#regMsg", data?.message || "Registered. You can login now.");
   }catch(e){
@@ -115,28 +96,20 @@ function toggleRaw(){
 async function doCalculate(){
   setMsg("#calcMsg", "");
   try{
-    const miles = Number($("#miles")?.value || 0);
-    const linehaul_rate = Number($("#linehaulRate")?.value || 0);
-    const deadhead_miles = Number($("#deadheadMiles")?.value || 0);
-    const deadhead_rate = Number($("#deadheadRate")?.value || 0);
-    const detention = Number($("#detention")?.value || 0);
-    const lumper_fee = Number($("#lumperFee")?.value || 0);
-    const extra_stop_fee = Number($("#extraStopFee")?.value || 0);
+    const body = {
+      miles: Number($("#miles")?.value || 0),
+      linehaul_rate: Number($("#linehaulRate")?.value || 0),
+      deadhead_miles: Number($("#deadheadMiles")?.value || 0),
+      deadhead_rate: Number($("#deadheadRate")?.value || 0),
+      detention: Number($("#detention")?.value || 0),
+      lumper_fee: Number($("#lumperFee")?.value || 0),
+      extra_stop_fee: Number($("#extraStopFee")?.value || 0),
+    };
 
     const token = getToken();
 
-    // IMPORTANT: backend is GET /calculate-rate (not POST)
-    const qs = new URLSearchParams({
-      miles: String(miles),
-      linehaul_rate: String(linehaul_rate),
-      deadhead_miles: String(deadhead_miles),
-      deadhead_rate: String(deadhead_rate),
-      detention: String(detention),
-      lumper_fee: String(lumper_fee),
-      extra_stop_fee: String(extra_stop_fee),
-    }).toString();
-
-    const data = await getJSON(`/calculate-rate?${qs}`, token);
+    // IMPORTANT: correct endpoint
+    const data = await postJSON("/calculate-rate", body, token);
 
     // raw
     const rawBox = $("#rawBox");
@@ -155,6 +128,7 @@ async function doCalculate(){
     $("#outAccessorials").textContent = money(b.accessorials_total);
     $("#outSubtotal").textContent = money(b.subtotal);
 
+    // show nice message if fuel missing
     if(fuel && fuel.error){
       setMsg("#calcMsg", `Fuel note: ${fuel.error}`);
     } else {
@@ -174,9 +148,11 @@ function init(){
   $("#btnLogout")?.addEventListener("click", doLogout);
   $("#btnRegister")?.addEventListener("click", doRegister);
 
+  // default hide raw
   $("#rawWrap")?.classList.add("hidden");
   $("#btnRaw") && ($("#btnRaw").textContent = "Show raw JSON");
 
+  // status pill based on stored token
   const hasToken = !!getToken();
   $("#statusPill") && ($("#statusPill").textContent = hasToken ? "Logged in" : "Not logged in");
 }
