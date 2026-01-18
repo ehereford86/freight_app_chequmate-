@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -14,44 +14,36 @@ app = FastAPI(title="Freight App API", version="0.1.0")
 
 
 # -----------------------------
-# Debug route gate + admin guard
+# Debug gate (safe + independent)
 # -----------------------------
 def _debug_enabled() -> bool:
     return os.environ.get("ENABLE_DEBUG_ROUTES", "0").strip() == "1"
 
 
-def _require_admin(user=Depends(lambda: None)):
+def _require_debug_token(x_debug_token: str | None) -> None:
     """
-    Requires an authenticated admin user.
-
-    This uses auth.get_current_user() if available; otherwise denies access.
-    We keep it defensive so your app doesn't crash on import changes.
-    """
-    try:
-        import auth  # local module
-        get_current_user = getattr(auth, "get_current_user", None)
-        if get_current_user is None:
-            raise HTTPException(status_code=403, detail="Admin only")
-        user = get_current_user()  # may raise internally
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(status_code=403, detail="Admin only")
-
-    if not user or (isinstance(user, dict) and user.get("role") != "admin"):
-        raise HTTPException(status_code=403, detail="Admin only")
-    return user
-
-
-@app.get("/_debug/env", include_in_schema=False)
-def _debug_env(_admin=Depends(_require_admin)):
-    """
-    Debug endpoint is OFF unless ENABLE_DEBUG_ROUTES=1.
-    Returns only presence + length (no secret leaked).
+    Debug routes require:
+      ENABLE_DEBUG_ROUTES=1
+      DEBUG_ADMIN_TOKEN set
+      Header: X-Debug-Token: <DEBUG_ADMIN_TOKEN>
     """
     if not _debug_enabled():
         raise HTTPException(status_code=404, detail="Not Found")
 
+    secret = os.environ.get("DEBUG_ADMIN_TOKEN", "").strip()
+    if not secret:
+        # if you accidentally enable debug without a token, keep it locked
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    if not x_debug_token or x_debug_token.strip() != secret:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+@app.get("/_debug/env", include_in_schema=False)
+def _debug_env(x_debug_token: str | None = Header(default=None, alias="X-Debug-Token")):
+    _require_debug_token(x_debug_token)
+
+    # Only returns presence + length (no secret leaked)
     v = os.environ.get("EIA_API_KEY")
     return {"has_EIA_API_KEY": bool(v), "EIA_API_KEY_len": (len(v) if v else 0)}
 
