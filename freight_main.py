@@ -11,6 +11,14 @@ INDEX_FILE = WEBAPP_DIR / "index.html"
 
 app = FastAPI(title="Freight App API", version="0.1.0")
 
+import os
+
+@app.get("/_debug/env")
+def _debug_env():
+    # Only returns presence + length (no secret leaked)
+    v = os.environ.get("EIA_API_KEY")
+    return {"has_EIA_API_KEY": bool(v), "EIA_API_KEY_len": (len(v) if v else 0)}
+
 # -----------------------------
 # Startup
 # -----------------------------
