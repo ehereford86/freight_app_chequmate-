@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+import os
 
 import db
 
@@ -11,13 +12,49 @@ INDEX_FILE = WEBAPP_DIR / "index.html"
 
 app = FastAPI(title="Freight App API", version="0.1.0")
 
-import os
 
-@app.get("/_debug/env")
-def _debug_env():
-    # Only returns presence + length (no secret leaked)
+# -----------------------------
+# Debug route gate + admin guard
+# -----------------------------
+def _debug_enabled() -> bool:
+    return os.environ.get("ENABLE_DEBUG_ROUTES", "0").strip() == "1"
+
+
+def _require_admin(user=Depends(lambda: None)):
+    """
+    Requires an authenticated admin user.
+
+    This uses auth.get_current_user() if available; otherwise denies access.
+    We keep it defensive so your app doesn't crash on import changes.
+    """
+    try:
+        import auth  # local module
+        get_current_user = getattr(auth, "get_current_user", None)
+        if get_current_user is None:
+            raise HTTPException(status_code=403, detail="Admin only")
+        user = get_current_user()  # may raise internally
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    if not user or (isinstance(user, dict) and user.get("role") != "admin"):
+        raise HTTPException(status_code=403, detail="Admin only")
+    return user
+
+
+@app.get("/_debug/env", include_in_schema=False)
+def _debug_env(_admin=Depends(_require_admin)):
+    """
+    Debug endpoint is OFF unless ENABLE_DEBUG_ROUTES=1.
+    Returns only presence + length (no secret leaked).
+    """
+    if not _debug_enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+
     v = os.environ.get("EIA_API_KEY")
     return {"has_EIA_API_KEY": bool(v), "EIA_API_KEY_len": (len(v) if v else 0)}
+
 
 # -----------------------------
 # Startup
@@ -39,12 +76,14 @@ def _startup():
     except Exception:
         pass
 
+
 # -----------------------------
 # Basic endpoints
 # -----------------------------
 @app.get("/", include_in_schema=False)
 def home():
     return {"message": "Freight app API is running"}
+
 
 # UI
 @app.get("/app", include_in_schema=False)
@@ -53,9 +92,11 @@ def app_ui():
         return HTMLResponse(INDEX_FILE.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>UI not found</h1>", status_code=404)
 
+
 # Serve /webapp assets
 if WEBAPP_DIR.exists():
     app.mount("/webapp", StaticFiles(directory=str(WEBAPP_DIR)), name="webapp")
+
 
 # Optional convenience routes (if your UI ever hits /app.js or /app.css)
 @app.get("/app.js", include_in_schema=False)
@@ -65,6 +106,7 @@ def app_js():
         return HTMLResponse(f.read_text(encoding="utf-8"), media_type="text/javascript")
     return JSONResponse({"detail": "Not Found"}, status_code=404)
 
+
 @app.get("/app.css", include_in_schema=False)
 def app_css():
     f = WEBAPP_DIR / "app.css"
@@ -72,8 +114,9 @@ def app_css():
         return HTMLResponse(f.read_text(encoding="utf-8"), media_type="text/css")
     return JSONResponse({"detail": "Not Found"}, status_code=404)
 
+
 # -----------------------------
-# API Routers (THIS IS THE FIX)
+# API Routers
 # -----------------------------
 def _safe_include(module_name: str):
     try:
@@ -85,6 +128,7 @@ def _safe_include(module_name: str):
     except Exception:
         return False
     return False
+
 
 # Must-have routers
 _safe_include("auth")
