@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
@@ -8,8 +9,8 @@ app = FastAPI(title="Chequmate Freight System", version="0.1.0")
 
 def _try_include(module_name: str, router_attr: str = "router") -> None:
     """
-    Best-effort include_router so Render doesn't crash if a module isn't present.
-    Keeps startup stable across environments.
+    Best-effort include_router so prod doesn't crash if a module isn't present.
+    IMPORTANT: We log loudly so you can see failures in Render logs.
     """
     try:
         mod = __import__(module_name)
@@ -17,24 +18,34 @@ def _try_include(module_name: str, router_attr: str = "router") -> None:
         app.include_router(router)
         print(f"[boot] included {module_name}.{router_attr}")
     except Exception as e:
-        print(f"[boot] WARNING: could not include {module_name}.{router_attr}: {e!r}")
+        print(f"[boot] ERROR including {module_name}.{router_attr}: {e!r}")
 
 
 @app.get("/", include_in_schema=False)
 def root():
-    # Simple health + hint for humans
     return JSONResponse({"ok": True, "service": "chequmate-freight-api"})
 
 
-# Core API routers
-_try_include("auth")            # /login, /register (if present)
-_try_include("db")              # if you expose anything (optional)
-_try_include("pricing")         # if router exists (optional)
-_try_include("loads")           # load routes
-_try_include("negotiate")       # negotiate routes
-_try_include("fuel")            # fuel routes
+@app.get("/__version", include_in_schema=False)
+def version():
+    # Render sets RENDER_GIT_COMMIT on most setups; if not, you'll see empty.
+    return JSONResponse(
+        {
+            "ok": True,
+            "render_git_commit": os.environ.get("RENDER_GIT_COMMIT", ""),
+            "python": os.environ.get("PYTHON_VERSION", ""),
+        }
+    )
 
-# UI routers (these are the ones you need on Render)
+
+# Core API routers
+_try_include("auth")
+_try_include("loads")
+_try_include("negotiate")
+_try_include("fuel")
+_try_include("admin_ui")  # if present / needed
+
+# UI routers you want exposed on Render
 _try_include("broker_ui")
 _try_include("driver_ui")
 _try_include("dispatcher_ui")
