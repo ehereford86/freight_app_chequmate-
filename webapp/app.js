@@ -1,184 +1,354 @@
-const API_BASE = ""; // same-origin
+/* Chequmate Universal Login / Register / Forgot Password
+   - Traditional login layout
+   - Does NOT touch broker_ui.py / driver_ui.py / dispatcher_ui.py
+*/
 
-function $(sel){ return document.querySelector(sel); }
-function money(n){
-  const v = Number(n || 0);
-  return v.toLocaleString(undefined, { style:"currency", currency:"USD" });
-}
+(function(){
+  const API = {
+    login: "/login",
+    register: "/register",
+    verify: "/verify-token",
+    pwReq: "/password-reset/request"
+  };
 
-function setMsg(id, txt){
-  const el = $(id);
-  if(el) el.textContent = txt || "";
-}
+  // Put your logo file here (served from /webapp/assets or /static).
+  // If you already have a logo in webapp/assets, keep that filename.
+  // This will gracefully fall back to text if missing.
+  const LOGO_URL = "/webapp/assets/chequmate-logo.png";
 
-function getToken(){ return localStorage.getItem("token") || ""; }
-function setToken(t){ localStorage.setItem("token", t); }
-function clearToken(){ localStorage.removeItem("token"); }
+  const STORE = {
+    tokenKey: "token",
+    userKey: "username",
+    roleKey: "role"
+  };
 
-async function postJSON(path, body, token=""){
-  const headers = { "Content-Type": "application/json" };
-  if(token) headers["Authorization"] = `Bearer ${token}`;
-
-  const r = await fetch(API_BASE + path, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
-
-  let data = null;
-  try { data = await r.json(); } catch(e){}
-
-  if(!r.ok){
-    const detail = (data && (data.detail || data.message)) ? (data.detail || data.message) : `HTTP ${r.status}`;
-    throw new Error(detail);
+  function $(id){ return document.getElementById(id); }
+  function esc(s){
+    if(s === null || s === undefined) return "";
+    return String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;");
   }
-  return data;
-}
 
-async function getJSON(path, token=""){
-  const headers = {};
-  if(token) headers["Authorization"] = `Bearer ${token}`;
+  function setToken(t){ localStorage.setItem(STORE.tokenKey, t || ""); }
+  function getToken(){ return localStorage.getItem(STORE.tokenKey) || ""; }
+  function setUser(u){ localStorage.setItem(STORE.userKey, u || ""); }
+  function setRole(r){ localStorage.setItem(STORE.roleKey, r || ""); }
 
-  const r = await fetch(API_BASE + path, {
-    method: "GET",
-    headers,
-  });
-
-  let data = null;
-  try { data = await r.json(); } catch(e){}
-
-  if(!r.ok){
-    const detail = (data && (data.detail || data.message)) ? (data.detail || data.message) : `HTTP ${r.status}`;
-    throw new Error(detail);
+  function toast(msg, kind){
+    const box = $("alertBox");
+    if(!box) return;
+    box.className = "alert" + (kind ? (" " + kind) : "");
+    box.innerHTML = esc(msg);
+    box.style.display = "block";
   }
-  return data;
-}
 
-// --- AUTH ---
-async function doLogin(){
-  setMsg("#loginMsg", "");
-  try{
-    const username = ($("#loginUser")?.value || "").trim();
-    const password = ($("#loginPass")?.value || "").trim();
-    if(!username || !password) throw new Error("Enter username + password");
-
-    // NOTE: if your backend login is GET-only, change this to getJSON(`/login?username=...&password=...`)
-    const data = await postJSON("/login", { username, password });
-
-    if(!data || !data.token) throw new Error("No token returned");
-    setToken(data.token);
-    $("#statusPill").textContent = "Logged in";
-    setMsg("#loginMsg", "Logged in.");
-  }catch(e){
-    $("#statusPill").textContent = "Not logged in";
-    setMsg("#loginMsg", `Login failed: ${e.message}`);
-  }
-}
-
-function doLogout(){
-  clearToken();
-  $("#statusPill").textContent = "Not logged in";
-  setMsg("#loginMsg", "Logged out.");
-}
-
-async function doRegister(){
-  setMsg("#regMsg", "");
-  try{
-    const username = ($("#regUser")?.value || "").trim();
-    const password = ($("#regPass")?.value || "").trim();
-    const role = ($("#regRole")?.value || "driver").trim();
-    const mc_number = ($("#regMc")?.value || "").trim();
-
-    if(!username || !password) throw new Error("Enter username + password");
-    if(password.length < 8) throw new Error("Password must be at least 8 characters");
-    if(role === "broker" && !mc_number) throw new Error("Broker MC# is required");
-
-    // NOTE: if your backend register is GET-only, change this to getJSON(`/register?...`)
-    const data = await postJSON("/register", { username, password, role, mc_number });
-    setMsg("#regMsg", data?.message || "Registered. You can login now.");
-  }catch(e){
-    setMsg("#regMsg", `Register failed: ${e.message}`);
-  }
-}
-
-// --- CALC ---
-function toggleRaw(){
-  const box = $("#rawWrap");
-  if(!box) return;
-  box.classList.toggle("hidden");
-  const btn = $("#btnRaw");
-  if(btn){
-    btn.textContent = box.classList.contains("hidden") ? "Show raw JSON" : "Hide raw JSON";
-  }
-}
-
-async function doCalculate(){
-  setMsg("#calcMsg", "");
-  try{
-    const miles = Number($("#miles")?.value || 0);
-    const linehaul_rate = Number($("#linehaulRate")?.value || 0);
-    const deadhead_miles = Number($("#deadheadMiles")?.value || 0);
-    const deadhead_rate = Number($("#deadheadRate")?.value || 0);
-    const detention = Number($("#detention")?.value || 0);
-    const lumper_fee = Number($("#lumperFee")?.value || 0);
-    const extra_stop_fee = Number($("#extraStopFee")?.value || 0);
-
-    const token = getToken();
-
-    // IMPORTANT: backend is GET /calculate-rate (not POST)
-    const qs = new URLSearchParams({
-      miles: String(miles),
-      linehaul_rate: String(linehaul_rate),
-      deadhead_miles: String(deadhead_miles),
-      deadhead_rate: String(deadhead_rate),
-      detention: String(detention),
-      lumper_fee: String(lumper_fee),
-      extra_stop_fee: String(extra_stop_fee),
-    }).toString();
-
-    const data = await getJSON(`/calculate-rate?${qs}`, token);
-
-    // raw
-    const rawBox = $("#rawBox");
-    if(rawBox) rawBox.textContent = JSON.stringify(data, null, 2);
-
-    const b = data?.breakdown || {};
-    const fuel = data?.fuel || {};
-
-    $("#outTotal").textContent = money(b.total);
-    $("#outFuel").textContent = money(b.fuel_total);
-
-    $("#outLinehaul").textContent = money(b.linehaul_total);
-    $("#outDeadhead").textContent = money(b.deadhead_total);
-    $("#outFuelRow").textContent = money(b.fuel_total);
-
-    $("#outAccessorials").textContent = money(b.accessorials_total);
-    $("#outSubtotal").textContent = money(b.subtotal);
-
-    if(fuel && fuel.error){
-      setMsg("#calcMsg", `Fuel note: ${fuel.error}`);
-    } else {
-      setMsg("#calcMsg", "");
+  async function apiPOST(path, body){
+    const res = await fetch(path, {
+      method:"POST",
+      headers: { "Content-Type":"application/json" },
+      body: JSON.stringify(body || {})
+    });
+    const j = await res.json().catch(()=>null);
+    if(!res.ok){
+      const msg = (j && j.detail) ? j.detail : ("HTTP " + res.status);
+      throw new Error(msg);
     }
-
-  }catch(e){
-    setMsg("#calcMsg", `Calc failed: ${e.message}`);
+    return j;
   }
-}
 
-function init(){
-  $("#btnCalc")?.addEventListener("click", doCalculate);
-  $("#btnRaw")?.addEventListener("click", toggleRaw);
+  async function apiGET(path){
+    const t = getToken();
+    const res = await fetch(path, {
+      headers: t ? { "Authorization": "Bearer " + t } : {}
+    });
+    const j = await res.json().catch(()=>null);
+    if(!res.ok){
+      const msg = (j && j.detail) ? j.detail : ("HTTP " + res.status);
+      throw new Error(msg);
+    }
+    return j;
+  }
 
-  $("#btnLogin")?.addEventListener("click", doLogin);
-  $("#btnLogout")?.addEventListener("click", doLogout);
-  $("#btnRegister")?.addEventListener("click", doRegister);
+  function routeByRole(role){
+    const r = String(role||"").toLowerCase();
+    if(r === "broker") return "/broker-ui";
+    if(r === "dispatcher") return "/dispatcher-ui";
+    return "/driver-ui";
+  }
 
-  $("#rawWrap")?.classList.add("hidden");
-  $("#btnRaw") && ($("#btnRaw").textContent = "Show raw JSON");
+  function setTab(tab){
+    // tab: login | register | forgot
+    const tabs = ["login","register","forgot"];
+    for(const t of tabs){
+      const btn = $("tab_" + t);
+      const pane = $("pane_" + t);
+      if(btn) btn.classList.toggle("active", t === tab);
+      if(pane) pane.style.display = (t === tab) ? "block" : "none";
+    }
+    toast("", "");
+    $("alertBox").style.display = "none";
+  }
 
-  const hasToken = !!getToken();
-  $("#statusPill") && ($("#statusPill").textContent = hasToken ? "Logged in" : "Not logged in");
-}
+  function render(){
+    const root = document.getElementById("app");
+    root.innerHTML = `
+      <div class="wrap">
+        <div class="shell">
 
-document.addEventListener("DOMContentLoaded", init);
+          <div class="card left">
+            <div class="brand">
+              <img src="${esc(LOGO_URL)}" alt="Chequmate" onerror="this.style.display='none'; document.getElementById('logoFallback').style.display='block';" />
+              <div>
+                <div class="name">Chequmate</div>
+                <div class="tag">Freight · Broker · Dispatcher · Driver</div>
+              </div>
+              <div id="logoFallback" style="display:none; font-weight:950; letter-spacing:.3px;">CHEQMATE</div>
+            </div>
+
+            <div class="tabs">
+              <div id="tab_login" class="tab active" onclick="window.__setTab('login')">Login</div>
+              <div id="tab_register" class="tab" onclick="window.__setTab('register')">Create account</div>
+              <div id="tab_forgot" class="tab" onclick="window.__setTab('forgot')">Forgot password</div>
+            </div>
+
+            <div>
+              <div class="h1">Sign in</div>
+              <p class="sub">Use your Chequmate account to access your role dashboard. Brokers require approval to use broker tools.</p>
+            </div>
+
+            <div id="alertBox" class="alert" style="display:none;"></div>
+
+            <!-- LOGIN -->
+            <div id="pane_login" class="form">
+              <div class="field">
+                <label>Username</label>
+                <input id="l_user" class="input" placeholder="e.g. broker3" autocomplete="username" />
+              </div>
+              <div class="field">
+                <label>Password</label>
+                <input id="l_pass" class="input" placeholder="••••••••" type="password" autocomplete="current-password" />
+              </div>
+              <div class="row">
+                <button id="btnLogin" class="btn" onclick="window.__doLogin()">Login</button>
+                <div class="smalllinks">
+                  <a href="javascript:void(0)" onclick="window.__setTab('forgot')">Forgot password?</a>
+                  <a href="javascript:void(0)" onclick="window.__setTab('register')">Create account</a>
+                </div>
+              </div>
+              <div class="alert warn" style="margin-top:8px;">
+                <b>Tester notes:</b> Fuel is weekly live (not cached). National average only for now. No “fuel price date” badge in UI yet. Env hot-reload is not supported by design.
+              </div>
+            </div>
+
+            <!-- REGISTER -->
+            <div id="pane_register" class="form" style="display:none;">
+              <div class="row" style="gap:10px;">
+                <div class="field" style="flex:1; min-width:220px;">
+                  <label>Username</label>
+                  <input id="r_user" class="input" placeholder="Choose a username" autocomplete="username" />
+                </div>
+                <div class="field" style="flex:1; min-width:220px;">
+                  <label>Password (min 8 chars)</label>
+                  <input id="r_pass" class="input" placeholder="Create a password" type="password" autocomplete="new-password" />
+                </div>
+              </div>
+
+              <div class="row" style="gap:10px;">
+                <div class="field" style="flex:1; min-width:220px;">
+                  <label>Role</label>
+                  <select id="r_role" onchange="window.__roleChanged()">
+                    <option value="driver">Driver</option>
+                    <option value="dispatcher">Dispatcher</option>
+                    <option value="broker">Broker (requires MC# + approval)</option>
+                  </select>
+                </div>
+                <div class="field" id="mcWrap" style="flex:1; min-width:220px; display:none;">
+                  <label>Broker MC#</label>
+                  <input id="r_mc" class="input" placeholder="MC123456" />
+                </div>
+              </div>
+
+              <div class="row">
+                <button id="btnRegister" class="btn ok" onclick="window.__doRegister()">Create account</button>
+                <div class="smalllinks">
+                  <a href="javascript:void(0)" onclick="window.__setTab('login')">Back to login</a>
+                </div>
+              </div>
+
+              <div class="alert" style="margin-top:8px;">
+                Brokers are created as <b>pending</b>. Admin must approve before broker features work.
+              </div>
+            </div>
+
+            <!-- FORGOT -->
+            <div id="pane_forgot" class="form" style="display:none;">
+              <div class="field">
+                <label>Email (recommended) or Username</label>
+                <input id="f_email" class="input" placeholder="you@email.com (or username)" />
+              </div>
+              <div class="row">
+                <button id="btnForgot" class="btn ghost" onclick="window.__doForgot()">Send reset link</button>
+                <div class="smalllinks">
+                  <a href="javascript:void(0)" onclick="window.__setTab('login')">Back to login</a>
+                </div>
+              </div>
+              <div class="alert" style="margin-top:8px;">
+                This sends a reset email if your backend mail config is set. If mail isn’t configured yet, you’ll see an error — that’s expected.
+              </div>
+            </div>
+
+            <div class="secure">
+              <div class="lock">🔒</div>
+              <div class="txt">
+                <b>Secure area</b><br/>
+                Your session uses token-based auth. Never share your password or token. Log out on shared devices.
+              </div>
+            </div>
+          </div>
+
+          <div class="card right">
+            <h3 class="promoTitle">Stay connected</h3>
+            <p class="promoSub">
+              Run loads, negotiate, and check status from anywhere. This portal is built to be simple and fast — like a real brokerage/driver platform should be.
+            </p>
+
+            <div class="screenshot">
+              App preview (replace with screenshot later)
+            </div>
+
+            <div class="badges">
+              <a class="badgeLink" href="#" onclick="alert('Add your real App Store link later.'); return false;">
+                 App Store <span class="mini">coming soon</span>
+              </a>
+              <a class="badgeLink" href="#" onclick="alert('Add your real Google Play link later.'); return false;">
+                ▶ Google Play <span class="mini">coming soon</span>
+              </a>
+            </div>
+
+            <div class="footerNote">
+              <div><b>Tip for testers:</b> Use <span class="mono">/docs</span> to explore API endpoints.</div>
+              <div style="margin-top:6px;">If you are a broker: you can log in immediately, but broker-only actions require approval.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    `;
+  }
+
+  async function doLogin(){
+    $("btnLogin").disabled = true;
+    try{
+      const username = ($("l_user").value || "").trim();
+      const password = ($("l_pass").value || "").trim();
+      if(!username || !password) throw new Error("Enter username and password");
+
+      const j = await apiPOST(API.login, { username, password });
+      if(!j || !j.token) throw new Error("Login did not return token");
+
+      setToken(j.token);
+      setUser(username);
+      setRole(j.role || "");
+
+      // Optional verification (gives broker status + mc)
+      let role = j.role || "";
+      let broker_status = j.broker_status || "";
+      try{
+        const v = await apiGET(API.verify);
+        role = v.role || role;
+        broker_status = v.broker_status || broker_status;
+      }catch(_e){}
+
+      // If broker but not approved, warn then still route to broker-ui (it will be blocked for broker-only actions)
+      if(String(role).toLowerCase() === "broker" && String(broker_status) !== "approved"){
+        toast("Broker login OK — status is '" + (broker_status || "pending") + "'. Broker tools require approval.", "warn");
+        // still let them proceed to broker-ui if you want:
+        window.location.href = routeByRole(role);
+        return;
+      }
+
+      window.location.href = routeByRole(role);
+    }catch(e){
+      toast(e.message || "Login failed", "bad");
+    }finally{
+      $("btnLogin").disabled = false;
+    }
+  }
+
+  async function doRegister(){
+    $("btnRegister").disabled = true;
+    try{
+      const username = ($("r_user").value || "").trim();
+      const password = ($("r_pass").value || "").trim();
+      const role = ($("r_role").value || "driver").trim();
+      const broker_mc = ($("r_mc").value || "").trim();
+
+      if(!username) throw new Error("Username required");
+      if(!password || password.length < 8) throw new Error("Password must be at least 8 characters");
+      if(role === "broker" && !broker_mc) throw new Error("Broker MC# required");
+
+      const payload = { username, password, role };
+      if(role === "broker") payload.broker_mc = broker_mc;
+
+      await apiPOST(API.register, payload);
+      toast("Account created. Now log in.", "ok");
+      setTab("login");
+      $("l_user").value = username;
+      $("l_pass").value = "";
+    }catch(e){
+      toast(e.message || "Registration failed", "bad");
+    }finally{
+      $("btnRegister").disabled = false;
+    }
+  }
+
+  async function doForgot(){
+    $("btnForgot").disabled = true;
+    try{
+      const v = ($("f_email").value || "").trim();
+      if(!v) throw new Error("Enter your email (recommended) or username");
+
+      // Your backend may expect {email:...}. If it expects username instead, adjust backend later.
+      // This is the cleanest “traditional” UX for now.
+      await apiPOST(API.pwReq, { email: v });
+
+      toast("If the account exists, a reset email was sent.", "ok");
+      setTab("login");
+    }catch(e){
+      toast(e.message || "Password reset request failed", "bad");
+    }finally{
+      $("btnForgot").disabled = false;
+    }
+  }
+
+  function roleChanged(){
+    const role = ($("r_role").value || "").trim();
+    $("mcWrap").style.display = (role === "broker") ? "block" : "none";
+  }
+
+  // Expose handlers
+  window.__setTab = setTab;
+  window.__doLogin = doLogin;
+  window.__doRegister = doRegister;
+  window.__doForgot = doForgot;
+  window.__roleChanged = roleChanged;
+
+  // Boot
+  render();
+  setTab("login");
+  roleChanged();
+
+  // Enter-to-submit convenience
+  document.addEventListener("keydown", (e)=>{
+    if(e.key !== "Enter") return;
+    const loginVisible = $("pane_login").style.display !== "none";
+    const regVisible = $("pane_register").style.display !== "none";
+    const forgotVisible = $("pane_forgot").style.display !== "none";
+    if(loginVisible) doLogin();
+    else if(regVisible) doRegister();
+    else if(forgotVisible) doForgot();
+  });
+})();
