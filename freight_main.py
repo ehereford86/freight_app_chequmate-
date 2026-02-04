@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import importlib
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -16,7 +18,7 @@ def _try_include(module_name: str, router_attr: str = "router") -> None:
     IMPORTANT: We log loudly so you can see failures in Render logs.
     """
     try:
-        mod = __import__(module_name)
+        mod = importlib.import_module(module_name)
         router = getattr(mod, router_attr)
         app.include_router(router)
         print(f"[boot] included {module_name}.{router_attr}")
@@ -49,6 +51,57 @@ def version():
             "python": os.environ.get("PYTHON_VERSION", ""),
         }
     )
+
+
+@app.get("/__routes", include_in_schema=False)
+def routes():
+    """
+    Debug helper: shows what routes are ACTUALLY mounted in the running app.
+    Safe: returns only method + path.
+    """
+    out = []
+    for r in app.routes:
+        path = getattr(r, "path", "")
+        methods = sorted(list(getattr(r, "methods", []) or []))
+        if path:
+            out.append({"path": path, "methods": methods})
+    out.sort(key=lambda x: x["path"])
+    return {"ok": True, "count": len(out), "routes": out}
+
+
+@app.get("/__importcheck", include_in_schema=False)
+def importcheck():
+    """
+    Debug helper: attempts to import each module and reports success/failure.
+    This tells us why /register is missing on Render (auth import error, etc).
+    """
+    modules = [
+        "auth",
+        "loads",
+        "negotiate",
+        "fuel",
+        "pricing",
+        "fmcsa",
+        "admin_ui",
+        "login_ui",
+        "broker_ui",
+        "driver_ui",
+        "dispatcher_ui",
+    ]
+
+    results: list[dict[str, Any]] = []
+    for name in modules:
+        row: dict[str, Any] = {"module": name, "ok": False}
+        try:
+            mod = importlib.import_module(name)
+            row["ok"] = True
+            row["has_router"] = hasattr(mod, "router")
+            row["file"] = getattr(mod, "__file__", "")
+        except Exception as e:
+            row["error"] = repr(e)
+        results.append(row)
+
+    return {"ok": True, "results": results}
 
 
 # Core API routers
