@@ -1,107 +1,637 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <title>Chequmat Login</title>
-    <style>
-        body {
-            background-color: #0f172a;
-            color: white;
-            font-family: Arial;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chequmate — Login</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel: rgba(18,26,51,.82);
+      --panel2: rgba(15,23,48,.92);
+      --text:#e8eeff;
+      --muted:#a8b3d6;
+      --border: rgba(255,255,255,.12);
+      --shadow: 0 18px 46px rgba(0,0,0,.50);
+      --radius: 16px;
 
-        form {
-            background-color: #020617;
-            padding: 30px;
-            border-radius: 10px;
-            width: 280px;
-        }
+      --brand:#4dd2ff;
+      --brand2:#3b82f6;
+      --danger:#ff4d4d;
+      --ok:#4dff88;
 
-        input {
-            width: 100%;
-            padding: 10px;
-            margin-top: 12px;
-            border: none;
-            border-radius: 5px;
-        }
-
-        button {
-            margin-top: 15px;
-            width: 100%;
-            padding: 10px;
-            background-color: #2563eb;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        h2 {
-            text-align: center;
-            margin-bottom: 10px;
-            letter-spacing: 1px;
-        }
-
-        #output {
-            margin-top: 10px;
-            font-size: 12px;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
-
-<form onsubmit="login(event)">
-<h2>CHEQUMATE</h2>
-
-    <input id="username" placeholder="Username" required>
-    <input id="password" type="password" placeholder="Password" required>
-
-    <button>Login</button>
-
-    <div id="output"></div>
-</form>
-
-<script>
-console.log("✅ Chequmate JS Loaded");
-
-async function login(event) {
-    event.preventDefault();
-
-    const user = document.getElementById("username").value;
-    const pass = document.getElementById("password").value;
-
-    const url = `/login?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
-
-    console.log("➡️ LOGIN URL:", url);
-
-    const res = await fetch(url);
-    const text = await res.text();
-
-    console.log("⬅️ RAW RESPONSE:", text);
-
-    try {
-        const data = JSON.parse(text);
-        console.log("✅ PARSED JSON:", data);
-
-        if (data.access_token) {
-            localStorage.setItem("chequmate_token", data.access_token);
-            console.log("🎯 TOKEN SAVED");
-            window.location.href = "/dispatcher-panel";
-        } else {
-            document.getElementById("output").innerText = JSON.stringify(data);
-        }
-    } catch (err) {
-        console.error("❌ JSON ERROR:", err);
-        document.getElementById("output").innerText = "Response was not JSON";
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
     }
-}
-</script>
 
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(1200px 650px at 15% 0%, rgba(77,210,255,0.14), transparent 55%),
+        radial-gradient(1000px 600px at 90% 10%, rgba(59,130,246,0.12), transparent 55%),
+        radial-gradient(900px 500px at 40% 100%, rgba(255,210,77,0.08), transparent 55%),
+        var(--bg);
+      min-height:100vh;
+    }
+
+    .wrap{
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 16px 22px;
+    }
+
+    .brandbar{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      margin: 10px 0 18px;
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      user-select:none;
+    }
+
+    .logoMark{
+      width:42px;height:42px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background: linear-gradient(135deg, rgba(77,210,255,.28), rgba(59,130,246,.22));
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+      display:grid;
+      place-items:center;
+      font-weight:900;
+      letter-spacing: .6px;
+    }
+    .logoMark span{ font-family: var(--mono); font-size: 14px; color: rgba(232,238,255,.92); }
+
+    .wordmark{
+      font-weight: 900;
+      letter-spacing: 3px;
+      font-size: 34px;
+      text-transform: uppercase;
+    }
+    .tagline{
+      margin-top:4px;
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing:.2px;
+    }
+
+    .panel{
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      padding: 18px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 900px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .h1{
+      font-weight: 900;
+      font-size: 18px;
+      margin: 0 0 10px;
+    }
+    .sub{
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0 0 16px;
+      line-height: 1.35;
+    }
+
+    .tabs{
+      display:flex;
+      gap:10px;
+      margin: 6px 0 14px;
+    }
+    .tab{
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      padding: 10px 12px;
+      border-radius: 999px;
+      cursor:pointer;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 12px;
+      letter-spacing: .4px;
+    }
+    .tab.active{
+      background: rgba(77,210,255,.14);
+      color: var(--text);
+      border-color: rgba(77,210,255,.25);
+    }
+
+    label{
+      display:block;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 10px 0 6px;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+
+    input, select, button{
+      width: 100%;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(15,23,48,.92);
+      color: var(--text);
+      outline: none;
+      font-size: 14px;
+    }
+    input::placeholder{ color: rgba(168,179,214,.70); }
+
+    .row{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 520px){
+      .row{ grid-template-columns: 1fr; }
+    }
+
+    .actions{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .link{
+      color: rgba(232,238,255,.88);
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 12px;
+      opacity: .85;
+    }
+    .link:hover{ opacity: 1; text-decoration: underline; }
+
+    .btn{
+      margin-top: 14px;
+      cursor:pointer;
+      font-weight: 900;
+      letter-spacing: .2px;
+      background: linear-gradient(135deg, rgba(77,210,255,.20), rgba(59,130,246,.22));
+      border: 1px solid rgba(77,210,255,.22);
+    }
+    .btn:hover{ filter: brightness(1.05); }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+    .smallnote{
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .msg{
+      margin-top: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--muted);
+      display:none;
+      white-space: pre-wrap;
+      overflow-wrap:anywhere;
+    }
+    .msg.ok{ border-color: rgba(77,255,136,.22); color: rgba(232,238,255,.92); }
+    .msg.err{ border-color: rgba(255,77,77,.26); color: rgba(255,210,210,.95); }
+
+    .promo{
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      gap: 14px;
+      height: 100%;
+    }
+    .promoTop{
+      border:1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.05);
+      padding: 14px;
+    }
+    .promoTitle{
+      font-weight: 900;
+      margin: 0 0 6px;
+      font-size: 14px;
+      letter-spacing: .2px;
+    }
+    .promoText{
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .phoneBox{
+      margin-top: 12px;
+      border-radius: 14px;
+      border: 1px dashed rgba(255,255,255,.16);
+      background: rgba(15,23,48,.75);
+      padding: 12px;
+      display:flex;
+      gap: 12px;
+      align-items:center;
+    }
+    .phoneImg{
+      width: 120px;
+      height: 160px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background:
+        linear-gradient(180deg, rgba(77,210,255,.16), rgba(59,130,246,.10));
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      flex: 0 0 auto;
+    }
+    .phoneImg img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      opacity:.95;
+    }
+    .phoneFallback{
+      padding: 10px;
+      text-align:center;
+      color: rgba(232,238,255,.88);
+      font-weight: 900;
+      letter-spacing: 1px;
+      font-size: 12px;
+    }
+
+    .storeBtns{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .storeBtn{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      text-decoration:none;
+      color: rgba(232,238,255,.92);
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing:.3px;
+      cursor:pointer;
+    }
+    .storeBtn:hover{ filter: brightness(1.06); }
+
+    .promoBottom{
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      background: rgba(255,255,255,.04);
+      padding: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .footer{
+      margin-top: 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      color: rgba(168,179,214,.85);
+      font-size: 12px;
+    }
+    .secure{
+      display:flex;
+      align-items:center;
+      gap: 8px;
+      opacity:.9;
+    }
+    .lock{
+      width: 10px;height:10px;
+      border-radius: 2px;
+      border: 1px solid rgba(255,255,255,.20);
+      position:relative;
+    }
+    .lock:before{
+      content:"";
+      position:absolute;
+      left:2px; right:2px;
+      top:-6px;
+      height:6px;
+      border:1px solid rgba(255,255,255,.20);
+      border-bottom:none;
+      border-radius: 8px 8px 0 0;
+    }
+    .footLinks{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    .footLinks a{
+      color: rgba(168,179,214,.90);
+      text-decoration:none;
+      font-weight: 800;
+      font-size: 12px;
+      opacity:.85;
+    }
+    .footLinks a:hover{ opacity: 1; text-decoration: underline; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="brandbar">
+      <div class="brand" aria-label="Chequmate">
+        <div class="logoMark" title="Chequmate">
+          <span>CQ</span>
+        </div>
+        <div>
+          <div class="wordmark">CHEQUMATE</div>
+          <div class="tagline">Broker • Dispatcher • Driver</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="grid">
+        <div>
+          <div class="h1">Log in</div>
+          <p class="sub">Use your account to access secure load boards, assignments, and driver tools.</p>
+
+          <div class="tabs" role="tablist" aria-label="Auth tabs">
+            <button class="tab active" id="tabLogin" onclick="showTab('login')" type="button">LOG IN</button>
+            <button class="tab" id="tabCreate" onclick="showTab('create')" type="button">CREATE ACCOUNT</button>
+          </div>
+
+          <div id="loginPane">
+            <label for="login_user">Username</label>
+            <input id="login_user" autocomplete="username" placeholder="username" />
+
+            <label for="login_pass">Password</label>
+            <input id="login_pass" type="password" autocomplete="current-password" placeholder="password" />
+
+            <label for="login_role">Open after login</label>
+            <select id="login_role">
+              <option value="broker">Broker</option>
+              <option value="dispatcher">Dispatcher</option>
+              <option value="driver">Driver</option>
+            </select>
+
+            <button class="btn" id="loginBtn" onclick="doLogin()" type="button">Log In</button>
+
+            <div class="actions">
+              <a class="link" href="#" onclick="forgotPassword(); return false;">Forgot password?</a>
+              <a class="link" href="#" onclick="showTab('create'); return false;">Create account</a>
+            </div>
+
+            <div class="smallnote">
+              Security note: token is stored in your browser for development. We can move to httpOnly cookies later.
+            </div>
+          </div>
+
+          <div id="createPane" style="display:none;">
+            <div class="h1" style="margin-top:2px;">Create account</div>
+            <p class="sub" style="margin-bottom:12px;">Set up a profile to test Chequmate. Choose your role.</p>
+
+            <label for="reg_user">Username</label>
+            <input id="reg_user" autocomplete="username" placeholder="choose a username" />
+
+            <div class="row">
+              <div>
+                <label for="reg_pass">Password</label>
+                <input id="reg_pass" type="password" autocomplete="new-password" placeholder="create a password" />
+              </div>
+              <div>
+                <label for="reg_pass2">Confirm password</label>
+                <input id="reg_pass2" type="password" autocomplete="new-password" placeholder="confirm password" />
+              </div>
+            </div>
+
+            <label for="reg_role">Role</label>
+            <select id="reg_role">
+              <option value="broker">Broker</option>
+              <option value="dispatcher">Dispatcher</option>
+              <option value="driver">Driver</option>
+            </select>
+
+            <button class="btn" id="regBtn" onclick="doRegister()" type="button">Create Account</button>
+
+            <div class="actions">
+              <a class="link" href="#" onclick="showTab('login'); return false;">Back to login</a>
+              <a class="link" href="#" onclick="forgotPassword(); return false;">Forgot password?</a>
+            </div>
+
+            <div class="smallnote">
+              If you haven’t built password reset yet, this page will still work for testing.
+            </div>
+          </div>
+
+          <div id="msg" class="msg"></div>
+        </div>
+
+        <div class="promo">
+          <div class="promoTop">
+            <div class="promoTitle">Stay connected with the Chequmate app</div>
+            <p class="promoText">
+              Dispatch updates, load details, and driver pay tools — built for fast decisions and clean paperwork.
+            </p>
+
+            <div class="phoneBox" aria-label="App promo">
+              <div class="phoneImg" title="Chequmate mobile preview">
+                <img src="/static/app_preview.png" alt="" onerror="this.remove();document.getElementById('phoneFallback').style.display='block';">
+                <div class="phoneFallback" id="phoneFallback" style="display:none;">CHEQUMATE<br/>MOBILE</div>
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:900; margin:0 0 6px;">Secure • Simple • Fast</div>
+                <div style="color:var(--muted); font-size:13px; line-height:1.4;">
+                  Designed like modern brokerage and driver portals — no clutter, just the tools people actually use.
+                </div>
+
+                <div class="storeBtns">
+                  <a class="storeBtn" href="#" onclick="toast('App Store link not set yet');return false;"> APP STORE</a>
+                  <a class="storeBtn" href="#" onclick="toast('Google Play link not set yet');return false;">▶︎ GOOGLE PLAY</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="promoBottom">
+            <b>Tip:</b> For testing, create separate accounts for broker/dispatcher/driver.
+            This keeps permissions clean and prevents “403 Forbidden” surprises when you hit role-protected endpoints.
+          </div>
+        </div>
+      </div>
+
+      <div class="footer" role="contentinfo">
+        <div class="secure">
+          <div class="lock" aria-hidden="true"></div>
+          <div><b>Secure area</b></div>
+        </div>
+        <div class="footLinks">
+          <a href="#" onclick="toast('Privacy page not set yet');return false;">Privacy</a>
+          <a href="#" onclick="toast('Security page not set yet');return false;">Security</a>
+          <a href="#" onclick="toast('Support link not set yet');return false;">Support</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function $(id){ return document.getElementById(id); }
+
+    function toast(text){
+      const el = $("msg");
+      el.className = "msg";
+      el.style.display = "block";
+      el.textContent = text;
+      setTimeout(()=>{ el.style.display = "none"; }, 3200);
+    }
+
+    function showMsg(kind, text){
+      const el = $("msg");
+      el.className = "msg " + (kind || "");
+      el.style.display = "block";
+      el.textContent = text;
+    }
+
+    function showTab(which){
+      const loginPane = $("loginPane");
+      const createPane = $("createPane");
+      const tabLogin = $("tabLogin");
+      const tabCreate = $("tabCreate");
+      $("msg").style.display = "none";
+
+      if(which === "create"){
+        loginPane.style.display = "none";
+        createPane.style.display = "block";
+        tabLogin.classList.remove("active");
+        tabCreate.classList.add("active");
+      }else{
+        loginPane.style.display = "block";
+        createPane.style.display = "none";
+        tabCreate.classList.remove("active");
+        tabLogin.classList.add("active");
+      }
+    }
+
+    function forgotPassword(){
+      showMsg("err", "Password reset isn’t wired up yet. For now, create a new test account or ask the admin to reset it.");
+    }
+
+    async function apiPOST(path, body){
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {})
+      });
+      const j = await res.json().catch(()=>null);
+      if(!res.ok){
+        const msg = (j && j.detail) ? j.detail : ("HTTP " + res.status);
+        throw new Error(msg);
+      }
+      return j;
+    }
+
+    function setAuth(token, username, role){
+      if(token) localStorage.setItem("token", token);
+      if(username) localStorage.setItem("username", username);
+      if(role) localStorage.setItem("role", role);
+    }
+
+    function goToRole(role){
+      if(role === "dispatcher") location.href = "/dispatcher-ui";
+      else if(role === "driver") location.href = "/driver-ui";
+      else location.href = "/broker-ui";
+    }
+
+    async function doLogin(){
+      const u = ($("login_user").value || "").trim();
+      const p = ($("login_pass").value || "").trim();
+      const role = $("login_role").value;
+
+      if(!u || !p){
+        showMsg("err","Enter username and password.");
+        return;
+      }
+
+      $("loginBtn").disabled = true;
+      try{
+        const j = await apiPOST("/login", { username: u, password: p });
+        if(!j || !j.token) throw new Error("Login did not return a token");
+        setAuth(j.token, u, role);
+        showMsg("ok","Logged in. Redirecting…");
+        setTimeout(()=>goToRole(role), 500);
+      }catch(e){
+        showMsg("err","Login failed: " + (e && e.message ? e.message : e));
+      }finally{
+        $("loginBtn").disabled = false;
+      }
+    }
+
+    async function doRegister(){
+      const u = ($("reg_user").value || "").trim();
+      const p = ($("reg_pass").value || "").trim();
+      const p2 = ($("reg_pass2").value || "").trim();
+      const role = $("reg_role").value;
+
+      if(!u || !p){
+        showMsg("err","Enter username and password.");
+        return;
+      }
+      if(p.length < 6){
+        showMsg("err","Password should be at least 6 characters for testing.");
+        return;
+      }
+      if(p !== p2){
+        showMsg("err","Passwords do not match.");
+        return;
+      }
+
+      $("regBtn").disabled = true;
+      try{
+        await apiPOST("/register", { username: u, password: p, role: role });
+        showMsg("ok","Account created. Logging you in…");
+        const j = await apiPOST("/login", { username: u, password: p });
+        if(!j || !j.token) throw new Error("Login did not return a token");
+        setAuth(j.token, u, role);
+        setTimeout(()=>goToRole(role), 650);
+      }catch(e){
+        showMsg("err","Create account failed: " + (e && e.message ? e.message : e));
+      }finally{
+        $("regBtn").disabled = false;
+      }
+    }
+
+    document.addEventListener("keydown", (ev)=>{
+      if(ev.key !== "Enter") return;
+      const createVisible = $("createPane").style.display !== "none";
+      if(createVisible) doRegister();
+      else doLogin();
+    });
+  </script>
 </body>
 </html>
-
