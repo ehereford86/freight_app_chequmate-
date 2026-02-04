@@ -1,23 +1,20 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
-
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Chequmate Freight System", version="0.1.0")
 
-ROOT = Path(__file__).resolve().parent
-STATIC_DIR = ROOT / "static"
+# Serve /static on Render too (login.html, images if you add them)
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    print(f"[boot] mounted /static -> {STATIC_DIR}")
 
 
 def _try_include(module_name: str, router_attr: str = "router") -> None:
-    """
-    Best-effort include_router so prod doesn't crash if a module isn't present.
-    Logs loudly so failures show up in Render logs.
-    """
     try:
         mod = __import__(module_name)
         router = getattr(mod, router_attr)
@@ -28,7 +25,10 @@ def _try_include(module_name: str, router_attr: str = "router") -> None:
 
 
 @app.get("/", include_in_schema=False)
-def root():
+def root(request: Request):
+    accept = (request.headers.get("accept") or "").lower()
+    if "text/html" in accept:
+        return RedirectResponse(url="/login-ui", status_code=302)
     return JSONResponse({"ok": True, "service": "chequmate-freight-api"})
 
 
@@ -43,24 +43,7 @@ def version():
     )
 
 
-# ---- Static + Universal Login UI ----
-# Render needs this so /static/login.html and images work.
-if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-    print(f"[boot] mounted /static -> {STATIC_DIR}")
-else:
-    print(f"[boot] WARNING: static dir not found at {STATIC_DIR}")
-
-
-@app.get("/login-ui", include_in_schema=False)
-def login_ui():
-    f = STATIC_DIR / "login.html"
-    if not f.exists():
-        return JSONResponse(status_code=404, content={"detail": "static/login.html not found"})
-    return FileResponse(str(f), media_type="text/html")
-
-
-# ---- Core API routers ----
+# Core API routers
 _try_include("auth")
 _try_include("loads")
 _try_include("negotiate")
@@ -69,7 +52,8 @@ _try_include("pricing")
 _try_include("fmcsa")
 _try_include("admin_ui")
 
-# ---- UI routers (already working for you) ----
+# UI routers exposed on Render
 _try_include("broker_ui")
 _try_include("driver_ui")
 _try_include("dispatcher_ui")
+_try_include("login_ui")

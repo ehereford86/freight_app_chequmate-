@@ -3,31 +3,28 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Chequmate — Log In</title>
+  <title>Chequmate — Login</title>
   <style>
     :root{
-      --bg: #f3f4f6;              /* light gray page */
-      --panel: #ffffff;           /* main panel */
-      --muted: #6b7280;           /* gray text */
-      --text: #111827;            /* near-black */
-      --border: #d1d5db;          /* light border */
-      --divider: #e5e7eb;         /* divider line */
-      --shadow: 0 8px 30px rgba(0,0,0,.10);
+      /* Use your existing dark app palette (matches broker/dispatcher/driver look) */
+      --bg:#0e1426;
+      --panel: rgba(17,26,51,.92);
+      --panel2: rgba(15,24,48,.95);
+      --text:#e6ecff;
+      --muted:#9aa7cc;
+      --border: rgba(255,255,255,.10);
+      --shadow: 0 18px 46px rgba(0,0,0,.55);
+      --radius: 14px;
 
-      /* Chequmate brand (not BOA red) */
-      --brand: #0f766e;           /* teal */
-      --brand2: #0b4f4a;          /* deeper teal */
-      --btn: #0f766e;
-      --btnHover: #0b5f58;
+      /* Brand accents (kept restrained, not BOA-ish) */
+      --brand:#2f5cff;
+      --brand2:#1e3fa8;
 
-      --link: #0f766e;
-      --linkHover: #0b5f58;
+      --danger:#ff4d4d;
+      --ok:#36d27e;
 
-      --danger: #b91c1c;
-      --ok: #065f46;
-
-      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
     }
 
     *{ box-sizing:border-box; }
@@ -35,39 +32,38 @@
       margin:0;
       font-family: var(--sans);
       color: var(--text);
-      background: var(--bg);
+      background:
+        radial-gradient(900px 500px at 15% 0%, rgba(47,92,255,0.16), transparent 55%),
+        radial-gradient(900px 500px at 90% 10%, rgba(30,63,168,0.16), transparent 55%),
+        var(--bg);
+      min-height:100vh;
     }
 
-    /* Top header */
-    .topbar{
-      background: #fff;
-      border-bottom: 1px solid var(--divider);
-    }
-    .topwrap{
+    .wrap{
       max-width: 1100px;
       margin: 0 auto;
-      padding: 14px 16px;
+      padding: 28px 16px 22px;
+    }
+
+    .brandbar{
       display:flex;
       align-items:center;
-      justify-content:space-between;
-      gap: 12px;
+      justify-content:center;
+      margin: 10px 0 18px;
     }
 
     .brand{
       display:flex;
       align-items:center;
-      gap: 12px;
+      gap:12px;
       user-select:none;
-      min-width: 260px;
     }
 
-    /* Uses your optional logo file if present */
     .logoBox{
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: linear-gradient(135deg, rgba(15,118,110,.12), rgba(11,79,74,.08));
+      width:56px;height:56px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.04);
       display:grid;
       place-items:center;
       overflow:hidden;
@@ -76,334 +72,284 @@
       width:100%;
       height:100%;
       object-fit:contain;
-      background:#fff;
+      display:block;
+      padding:8px;
     }
     .logoFallback{
-      font-weight: 900;
+      display:none;
+      width:100%;
+      height:100%;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
       font-family: var(--mono);
-      color: var(--brand2);
-      letter-spacing: .5px;
-      font-size: 14px;
+      letter-spacing:.5px;
+      background: linear-gradient(135deg, var(--brand), var(--brand2));
     }
 
     .wordmark{
       font-weight: 900;
-      letter-spacing: 2.5px;
-      font-size: 20px;
+      letter-spacing: 3px;
+      font-size: 34px;
       text-transform: uppercase;
-      line-height: 1.05;
+      line-height:1;
     }
     .tagline{
-      font-size: 12px;
+      margin-top:6px;
       color: var(--muted);
-      margin-top: 2px;
-    }
-
-    .pageTitle{
-      font-weight: 800;
-      font-size: 18px;
-      color: #374151;
-      white-space:nowrap;
-    }
-
-    /* Title band (like your screenshot, but Chequmate-branded) */
-    .band{
-      background: linear-gradient(90deg, var(--brand), var(--brand2));
-      color: #fff;
-      border-bottom: 1px solid rgba(0,0,0,.08);
-    }
-    .bandwrap{
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 14px 16px;
-      font-weight: 900;
-      letter-spacing: .2px;
-      font-size: 18px;
-    }
-
-    /* Main panel */
-    .wrap{
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 18px 16px 24px;
+      font-size: 13px;
+      letter-spacing:.2px;
     }
 
     .panel{
       background: var(--panel);
       border: 1px solid var(--border);
+      border-radius: var(--radius);
       box-shadow: var(--shadow);
-      border-radius: 8px;
-      overflow:hidden;
+      padding: 18px;
     }
 
     .grid{
       display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0;
-      min-height: 420px;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 16px;
+      align-items: stretch;
     }
-
     @media (max-width: 900px){
       .grid{ grid-template-columns: 1fr; }
-      .right{ border-left: none !important; border-top: 1px solid var(--divider); }
     }
 
-    .left, .right{
-      padding: 22px 22px 18px;
-    }
-
-    .right{
-      border-left: 1px solid var(--divider);
-      background: #fafafa;
-    }
-
-    .h2{
-      font-size: 14px;
+    .h1{
       font-weight: 900;
-      margin: 0 0 12px;
-      color: #111827;
-      letter-spacing: .2px;
+      font-size: 18px;
+      margin: 0 0 10px;
+    }
+    .sub{
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0 0 16px;
+      line-height: 1.35;
+    }
+
+    .tabs{
+      display:flex;
+      gap:10px;
+      margin: 6px 0 14px;
+      flex-wrap:wrap;
+    }
+    .tab{
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      padding: 10px 12px;
+      border-radius: 999px;
+      cursor:pointer;
+      color: var(--muted);
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing: .4px;
+    }
+    .tab.active{
+      background: rgba(47,92,255,.18);
+      color: var(--text);
+      border-color: rgba(47,92,255,.30);
     }
 
     label{
       display:block;
       font-size: 12px;
+      color: var(--muted);
+      margin: 10px 0 6px;
       font-weight: 800;
-      color: #374151;
-      margin: 12px 0 6px;
+      letter-spacing: .2px;
     }
 
     input, select, button{
       width: 100%;
+      padding: 12px 12px;
+      border-radius: 12px;
       border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px 10px;
-      font-size: 14px;
-      background: #fff;
+      background: var(--panel2);
       color: var(--text);
       outline: none;
+      font-size: 14px;
     }
-    input:focus, select:focus{
-      border-color: rgba(15,118,110,.55);
-      box-shadow: 0 0 0 3px rgba(15,118,110,.12);
-    }
+    input::placeholder{ color: rgba(154,167,204,.78); }
 
     .row{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .check{
-      display:flex;
-      align-items:center;
-      gap: 8px;
-      font-size: 12px;
-      color: #374151;
-      user-select:none;
-    }
-    .check input{
-      width: 14px;
-      height: 14px;
-      padding:0;
-      margin:0;
-    }
-
-    .helpLinks{
-      margin-top: 10px;
-      font-size: 12px;
-    }
-    .helpLinks a{
-      color: var(--link);
-      text-decoration:none;
-      font-weight: 800;
-    }
-    .helpLinks a:hover{ color: var(--linkHover); text-decoration: underline; }
-
-    .btn{
-      margin-top: 14px;
-      background: var(--btn);
-      color: #fff;
-      font-weight: 900;
-      cursor:pointer;
-      border: 1px solid rgba(0,0,0,.08);
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap: 8px;
-    }
-    .btn:hover{ background: var(--btnHover); }
-    .btn:disabled{ opacity:.6; cursor:not-allowed; }
-
-    .btnSmall{
-      margin-top: 10px;
-      background: #fff;
-      border: 1px solid var(--border);
-      color: #111827;
-      font-weight: 900;
-      cursor:pointer;
-    }
-    .btnSmall:hover{
-      border-color: rgba(15,118,110,.45);
-      box-shadow: 0 0 0 3px rgba(15,118,110,.10);
-    }
-
-    .note{
-      margin-top: 12px;
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.35;
-    }
-
-    .msg{
-      display:none;
-      margin-top: 12px;
-      border-radius: 6px;
-      padding: 10px;
-      font-size: 13px;
-      border: 1px solid var(--border);
-      background: #f9fafb;
-      white-space: pre-wrap;
-      overflow-wrap:anywhere;
-    }
-    .msg.ok{ border-color: rgba(6,95,70,.25); background: rgba(6,95,70,.06); color: var(--ok); }
-    .msg.err{ border-color: rgba(185,28,28,.25); background: rgba(185,28,28,.06); color: var(--danger); }
-
-    /* Right promo (classic) */
-    .promoTitle{
-      font-weight: 900;
-      font-size: 16px;
-      margin: 0 0 10px;
-      color: #111827;
-    }
-    .promoText{
-      margin: 0 0 14px;
-      color: #374151;
-      font-size: 13px;
-      line-height: 1.45;
-    }
-
-    .promoBox{
-      display:flex;
-      gap: 14px;
-      align-items:center;
-      padding: 14px;
-      border: 1px solid var(--divider);
-      background: #fff;
-      border-radius: 8px;
-    }
-
-    .phone{
-      width: 160px;
-      height: 200px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow:hidden;
-      background: #fff;
       display:grid;
-      place-items:center;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
     }
-    .phone img{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      display:block;
-    }
-    .phoneFallback{
-      text-align:center;
-      padding: 10px;
-      font-weight: 900;
-      color: var(--brand2);
-      letter-spacing: .8px;
-      font-size: 12px;
+    @media (max-width: 520px){
+      .row{ grid-template-columns: 1fr; }
     }
 
-    .promoRight{
-      flex:1;
-      min-width: 0;
-    }
-
-    .promoBullets{
-      margin: 0 0 10px;
-      padding-left: 18px;
-      color: #374151;
-      font-size: 13px;
-      line-height: 1.45;
-    }
-    .promoBullets li{ margin: 6px 0; }
-
-    .getApp{
-      display:flex;
-      align-items:center;
-      gap: 10px;
-      flex-wrap:wrap;
-      margin-top: 10px;
-    }
-
-    .store{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      padding: 10px 12px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      background: #fff;
-      text-decoration:none;
-      color: #111827;
-      font-weight: 900;
-      font-size: 12px;
-      cursor:pointer;
-    }
-    .store:hover{
-      border-color: rgba(15,118,110,.45);
-      box-shadow: 0 0 0 3px rgba(15,118,110,.10);
-    }
-
-    .cta{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      padding: 10px 12px;
-      border-radius: 6px;
-      border: 1px solid rgba(0,0,0,.10);
-      background: var(--btn);
-      color: #fff;
-      font-weight: 900;
-      font-size: 12px;
-      cursor:pointer;
-      text-decoration:none;
-    }
-    .cta:hover{ background: var(--btnHover); }
-
-    /* Footer */
-    .footer{
-      border-top: 1px solid var(--divider);
-      background: #f3f4f6;
-      padding: 12px 16px;
+    .actions{
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap: 12px;
+      margin-top: 12px;
       flex-wrap:wrap;
     }
+    .link{
+      color: rgba(230,236,255,.88);
+      text-decoration: none;
+      font-weight: 900;
+      font-size: 12px;
+      opacity: .85;
+    }
+    .link:hover{ opacity: 1; text-decoration: underline; }
 
+    .btn{
+      margin-top: 14px;
+      cursor:pointer;
+      font-weight: 900;
+      letter-spacing: .2px;
+      background: linear-gradient(135deg, rgba(47,92,255,.95), rgba(30,63,168,.95));
+      border: 1px solid rgba(47,92,255,.28);
+    }
+    .btn:hover{ filter: brightness(1.05); }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
+
+    .smallnote{
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .msg{
+      margin-top: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--muted);
+      display:none;
+      white-space: pre-wrap;
+      overflow-wrap:anywhere;
+    }
+    .msg.ok{ border-color: rgba(54,210,126,.30); color: rgba(230,236,255,.95); }
+    .msg.err{ border-color: rgba(255,77,77,.30); color: rgba(255,210,210,.95); }
+
+    .promo{
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      gap: 14px;
+      height: 100%;
+    }
+    .promoTop{
+      border:1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.04);
+      padding: 14px;
+    }
+    .promoTitle{
+      font-weight: 900;
+      margin: 0 0 6px;
+      font-size: 14px;
+      letter-spacing: .2px;
+    }
+    .promoText{
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .phoneBox{
+      margin-top: 12px;
+      border-radius: 14px;
+      border: 1px dashed rgba(255,255,255,.16);
+      background: rgba(15,24,48,.75);
+      padding: 12px;
+      display:flex;
+      gap: 12px;
+      align-items:center;
+    }
+    .phoneImg{
+      width: 120px;
+      height: 160px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: linear-gradient(180deg, rgba(47,92,255,.16), rgba(30,63,168,.10));
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      flex: 0 0 auto;
+    }
+    .phoneImg img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      opacity:.95;
+    }
+    .phoneFallback{
+      padding: 10px;
+      text-align:center;
+      color: rgba(230,236,255,.90);
+      font-weight: 900;
+      letter-spacing: 1px;
+      font-size: 12px;
+    }
+
+    .storeBtns{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .storeBtn{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      text-decoration:none;
+      color: rgba(230,236,255,.92);
+      font-weight: 900;
+      font-size: 12px;
+      letter-spacing:.3px;
+      cursor:pointer;
+    }
+    .storeBtn:hover{ filter: brightness(1.06); }
+
+    .promoBottom{
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      background: rgba(255,255,255,.04);
+      padding: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .footer{
+      margin-top: 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      color: rgba(154,167,204,.90);
+      font-size: 12px;
+    }
     .secure{
       display:flex;
       align-items:center;
       gap: 8px;
-      color: #374151;
-      font-size: 12px;
-      font-weight: 900;
+      opacity:.9;
     }
     .lock{
-      width: 10px;
-      height: 10px;
-      border: 1px solid #6b7280;
+      width: 10px;height:10px;
       border-radius: 2px;
-      position: relative;
-      opacity: .8;
+      border: 1px solid rgba(255,255,255,.20);
+      position:relative;
     }
     .lock:before{
       content:"";
@@ -411,205 +357,235 @@
       left:2px; right:2px;
       top:-6px;
       height:6px;
-      border:1px solid #6b7280;
+      border:1px solid rgba(255,255,255,.20);
       border-bottom:none;
       border-radius: 8px 8px 0 0;
-      opacity: .8;
     }
-
-    .footlinks{
+    .footLinks{
       display:flex;
       align-items:center;
       gap: 10px;
       flex-wrap:wrap;
-      font-size: 12px;
+      justify-content:flex-end;
     }
-    .footlinks a{
-      color: var(--link);
+    .footLinks a{
+      color: rgba(154,167,204,.95);
       text-decoration:none;
       font-weight: 900;
+      font-size: 12px;
+      opacity:.85;
     }
-    .footlinks a:hover{ color: var(--linkHover); text-decoration: underline; }
+    .footLinks a:hover{ opacity: 1; text-decoration: underline; }
 
-    .mutedSmall{
+    /* small reset pane helper */
+    .hint{
       color: var(--muted);
       font-size: 12px;
-      font-weight: 700;
+      margin-top: 8px;
+      line-height:1.35;
     }
   </style>
 </head>
 
 <body>
-  <header class="topbar">
-    <div class="topwrap">
-      <div class="brand">
-        <div class="logoBox" aria-label="Chequmate logo">
-          <!-- Optional: drop your real logo at static/chequmate_logo.png -->
-          <img src="/static/chequmate_logo.png" alt="" onerror="this.remove();document.getElementById('logoFallback').style.display='block';">
-          <div id="logoFallback" class="logoFallback" style="display:none;">CQ</div>
+  <div class="wrap">
+    <div class="brandbar">
+      <div class="brand" aria-label="Chequmate">
+        <div class="logoBox" title="Chequmate">
+          <!-- REAL LOGO (you already have this in /webapp/assets/) -->
+          <img src="/webapp/assets/chequmate-logo.png" alt="Chequmate"
+               onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex';">
+          <div class="logoFallback" id="logoFallback">CQ</div>
         </div>
         <div>
           <div class="wordmark">CHEQUMATE</div>
           <div class="tagline">Broker • Dispatcher • Driver</div>
         </div>
       </div>
-      <div class="pageTitle">Log In</div>
     </div>
-  </header>
 
-  <div class="band">
-    <div class="bandwrap">Log in to Chequmate Freight</div>
-  </div>
-
-  <main class="wrap">
-    <section class="panel" aria-label="Login panel">
+    <div class="panel">
       <div class="grid">
+        <!-- LEFT: Auth -->
+        <div>
+          <div class="h1">Log in</div>
+          <p class="sub">Access secure load boards, assignments, and tools.</p>
 
-        <!-- LEFT: login + create -->
-        <div class="left">
-          <div class="h2">Access your account</div>
+          <div class="tabs" role="tablist" aria-label="Auth tabs">
+            <button class="tab active" id="tabLogin" onclick="showTab('login')" type="button">LOG IN</button>
+            <button class="tab" id="tabCreate" onclick="showTab('create')" type="button">CREATE ACCOUNT</button>
+            <button class="tab" id="tabReset" onclick="showTab('reset')" type="button">RESET PASSWORD</button>
+          </div>
 
-          <!-- LOGIN -->
+          <!-- LOGIN FORM -->
           <div id="loginPane">
-            <label for="login_user">User ID</label>
-            <input id="login_user" autocomplete="username" placeholder="Enter your username" />
+            <label for="login_user">Username</label>
+            <input id="login_user" autocomplete="username" placeholder="username" />
+
+            <label for="login_pass">Password</label>
+            <input id="login_pass" type="password" autocomplete="current-password" placeholder="password" />
+
+            <label for="login_role">Open after login</label>
+            <select id="login_role">
+              <option value="broker">Broker</option>
+              <option value="dispatcher">Dispatcher</option>
+              <option value="driver">Driver</option>
+            </select>
+
+            <button class="btn" id="loginBtn" onclick="doLogin()" type="button">Log In</button>
+
+            <div class="actions">
+              <a class="link" href="#" onclick="showTab('reset'); return false;">Forgot password?</a>
+              <a class="link" href="#" onclick="showTab('create'); return false;">Create account</a>
+            </div>
+
+            <div class="smallnote">
+              Testing note: token is stored in your browser for now (dev behavior).
+            </div>
+          </div>
+
+          <!-- CREATE ACCOUNT FORM -->
+          <div id="createPane" style="display:none;">
+            <div class="h1" style="margin-top:2px;">Create account</div>
+            <p class="sub" style="margin-bottom:12px;">Choose a role. Brokers must enter MC# (verification required).</p>
+
+            <label for="reg_user">Username</label>
+            <input id="reg_user" autocomplete="username" placeholder="choose a username" />
 
             <div class="row">
-              <div style="flex:1; min-width:0;">
-                <label for="login_pass">Password</label>
-                <input id="login_pass" type="password" autocomplete="current-password" placeholder="Enter your password" />
+              <div>
+                <label for="reg_pass">Password</label>
+                <input id="reg_pass" type="password" autocomplete="new-password" placeholder="create a password" />
+              </div>
+              <div>
+                <label for="reg_pass2">Confirm password</label>
+                <input id="reg_pass2" type="password" autocomplete="new-password" placeholder="confirm password" />
               </div>
             </div>
 
-            <div class="row">
-              <label class="check">
-                <input id="rememberUser" type="checkbox" />
-                Save this User ID
-              </label>
-            </div>
-
-            <button class="btn" id="loginBtn" type="button" onclick="doLogin()">
-              <span aria-hidden="true">🔒</span> Log In
-            </button>
-
-            <div class="helpLinks">
-              <a href="#" onclick="forgotPassword();return false;">Forgot your password?</a>
-            </div>
-
-            <div class="note">
-              First time here? Create an account below. Brokers must submit an MC# and will be pending until approved.
-            </div>
-
-            <button class="btnSmall" type="button" onclick="showCreate(true)">Create an account</button>
-          </div>
-
-          <!-- CREATE -->
-          <div id="createPane" style="display:none;">
-            <div class="h2">Create an account</div>
-
-            <label for="reg_user">User ID</label>
-            <input id="reg_user" autocomplete="username" placeholder="Choose a username" />
-
-            <label for="reg_pass">Password</label>
-            <input id="reg_pass" type="password" autocomplete="new-password" placeholder="Create a password (min 8)" />
-
-            <label for="reg_pass2">Confirm password</label>
-            <input id="reg_pass2" type="password" autocomplete="new-password" placeholder="Re-enter password" />
-
-            <label for="reg_role">Account type</label>
+            <label for="reg_role">Role</label>
             <select id="reg_role" onchange="toggleBrokerMC()">
-              <option value="driver">Driver</option>
-              <option value="dispatcher">Dispatcher</option>
               <option value="broker">Broker</option>
+              <option value="dispatcher">Dispatcher</option>
+              <option value="driver">Driver</option>
             </select>
 
-            <div id="brokerMCWrap" style="display:none;">
-              <label for="reg_broker_mc">Broker MC Number</label>
-              <input id="reg_broker_mc" inputmode="numeric" placeholder="MC123456" />
-              <div class="note">Required for broker accounts. Status will be <b>pending</b> until approved.</div>
+            <div id="brokerMcWrap" style="display:block;">
+              <label for="reg_mc">Broker MC#</label>
+              <input id="reg_mc" placeholder="MC123456" />
+              <div class="hint">Brokers start as <b>pending</b> until approved. Dispatchers/drivers don’t need MC#.</div>
             </div>
 
-            <button class="btn" id="regBtn" type="button" onclick="doRegister()">
-              Create Account
-            </button>
+            <button class="btn" id="regBtn" onclick="doRegister()" type="button">Create Account</button>
 
-            <div class="helpLinks" style="margin-top:10px;">
-              <a href="#" onclick="showCreate(false);return false;">Back to Log In</a>
-              <span class="mutedSmall"> • </span>
-              <a href="#" onclick="forgotPassword();return false;">Forgot your password?</a>
+            <div class="actions">
+              <a class="link" href="#" onclick="showTab('login'); return false;">Back to login</a>
+              <a class="link" href="#" onclick="showTab('reset'); return false;">Forgot password?</a>
+            </div>
+          </div>
+
+          <!-- RESET PASSWORD -->
+          <div id="resetPane" style="display:none;">
+            <div class="h1" style="margin-top:2px;">Reset password</div>
+            <p class="sub" style="margin-bottom:12px;">
+              Request a reset token, then confirm it with a new password.
+            </p>
+
+            <label for="rst_user">Username or Email</label>
+            <input id="rst_user" placeholder="username or email" />
+
+            <button class="btn" id="rstReqBtn" onclick="requestReset()" type="button">Send Reset Token</button>
+
+            <div class="hint">
+              If email is configured, the token is emailed. For dev/testing, the API may return it directly.
+            </div>
+
+            <hr style="border:none;border-top:1px solid rgba(255,255,255,.10); margin:14px 0;">
+
+            <label for="rst_token">Reset token</label>
+            <input id="rst_token" placeholder="paste token here" />
+
+            <div class="row">
+              <div>
+                <label for="rst_pass">New password</label>
+                <input id="rst_pass" type="password" placeholder="new password" />
+              </div>
+              <div>
+                <label for="rst_pass2">Confirm new password</label>
+                <input id="rst_pass2" type="password" placeholder="confirm" />
+              </div>
+            </div>
+
+            <button class="btn" id="rstConfBtn" onclick="confirmReset()" type="button">Set New Password</button>
+
+            <div class="actions">
+              <a class="link" href="#" onclick="showTab('login'); return false;">Back to login</a>
+              <a class="link" href="#" onclick="showTab('create'); return false;">Create account</a>
             </div>
           </div>
 
           <div id="msg" class="msg"></div>
         </div>
 
-        <!-- RIGHT: promo -->
-        <div class="right">
-          <div class="promoTitle">Stay connected with the Chequmate app</div>
-          <p class="promoText">
-            Built for freight operations — dispatch updates, load details, and driver tools in one place.
-          </p>
+        <!-- RIGHT: Promo -->
+        <div class="promo">
+          <div class="promoTop">
+            <div class="promoTitle">Stay connected with the Chequmate app</div>
+            <p class="promoText">
+              Dispatch updates, load details, and pay tools — built for fast decisions and clean paperwork.
+            </p>
 
-          <div class="promoBox" aria-label="App promo">
-            <div class="phone" title="Chequmate mobile preview">
-              <!-- Optional: add static/app_preview.png -->
-              <img src="/static/app_preview.png" alt="" onerror="this.remove();document.getElementById('phoneFallback').style.display='block';">
-              <div id="phoneFallback" class="phoneFallback" style="display:none;">
-                CHEQUMATE<br/>MOBILE
+            <div class="phoneBox" aria-label="App promo">
+              <div class="phoneImg" title="Chequmate mobile preview">
+                <!-- optional image: static/app_preview.png -->
+                <img src="/static/app_preview.png" alt="" onerror="this.remove();document.getElementById('phoneFallback').style.display='block';">
+                <div class="phoneFallback" id="phoneFallback" style="display:none;">CHEQUMATE<br/>MOBILE</div>
               </div>
-            </div>
-            <div class="promoRight">
-              <ul class="promoBullets">
-                <li>Secure access to brokerage, dispatcher, and driver areas</li>
-                <li>Fast load workflows — no clutter</li>
-                <li>Designed for real trucking operations</li>
-              </ul>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:900; margin:0 0 6px;">Secure • Simple • Fast</div>
+                <div style="color:var(--muted); font-size:13px; line-height:1.4;">
+                  Designed like modern brokerage and driver portals — no clutter, just the tools people actually use.
+                </div>
 
-              <a class="cta" href="#" onclick="toast('App download link not set yet');return false;">
-                Get the app
-              </a>
-
-              <div class="getApp">
-                <a class="store" href="#" onclick="toast('App Store link not set yet');return false;"> App Store</a>
-                <a class="store" href="#" onclick="toast('Google Play link not set yet');return false;">Google Play</a>
-              </div>
-
-              <div class="note">
-                (For testing, these buttons can stay placeholders until you publish.)
+                <div class="storeBtns">
+                  <a class="storeBtn" href="#" onclick="toast('App Store link not set yet');return false;"> APP STORE</a>
+                  <a class="storeBtn" href="#" onclick="toast('Google Play link not set yet');return false;">▶︎ GOOGLE PLAY</a>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
+          <div class="promoBottom">
+            <b>Tip:</b> Create separate accounts for broker/dispatcher/driver during testing.
+            It keeps permissions clean and avoids “Forbidden” surprises.
+          </div>
+        </div>
       </div>
 
-      <div class="footer">
+      <div class="footer" role="contentinfo">
         <div class="secure">
-          <span class="lock" aria-hidden="true"></span>
-          Secure area
+          <div class="lock" aria-hidden="true"></div>
+          <div><b>Secure area</b></div>
         </div>
-        <div class="footlinks">
-          <a href="#" onclick="toast('Privacy link not set yet');return false;">Privacy</a>
-          <a href="#" onclick="toast('Security link not set yet');return false;">Security</a>
+        <div class="footLinks">
+          <a href="#" onclick="toast('Privacy page not set yet');return false;">Privacy</a>
+          <a href="#" onclick="toast('Security page not set yet');return false;">Security</a>
           <a href="#" onclick="toast('Support link not set yet');return false;">Support</a>
         </div>
       </div>
-    </section>
-  </main>
+    </div>
+  </div>
 
   <script>
     function $(id){ return document.getElementById(id); }
 
-    // Remember username (classic behavior)
-    (function bootRemember(){
-      try{
-        const saved = localStorage.getItem("remember_user") || "";
-        if(saved){
-          $("login_user").value = saved;
-          $("rememberUser").checked = true;
-        }
-      }catch(e){}
-    })();
+    function toast(text){
+      const el = $("msg");
+      el.className = "msg";
+      el.style.display = "block";
+      el.textContent = text;
+      setTimeout(()=>{ el.style.display = "none"; }, 3200);
+    }
 
     function showMsg(kind, text){
       const el = $("msg");
@@ -618,29 +594,37 @@
       el.textContent = text;
     }
 
-    function toast(text){
-      showMsg("", text);
-      setTimeout(()=>{ $("msg").style.display = "none"; }, 2600);
-    }
+    function showTab(which){
+      const panes = ["loginPane","createPane","resetPane"];
+      panes.forEach(p => $(p).style.display = "none");
 
-    function showCreate(on){
+      ["tabLogin","tabCreate","tabReset"].forEach(t => $(t).classList.remove("active"));
       $("msg").style.display = "none";
-      $("loginPane").style.display = on ? "none" : "block";
-      $("createPane").style.display = on ? "block" : "none";
-      if(on){
+
+      if(which === "create"){
+        $("createPane").style.display = "block";
+        $("tabCreate").classList.add("active");
         toggleBrokerMC();
+      }else if(which === "reset"){
+        $("resetPane").style.display = "block";
+        $("tabReset").classList.add("active");
+      }else{
+        $("loginPane").style.display = "block";
+        $("tabLogin").classList.add("active");
       }
     }
 
     function toggleBrokerMC(){
       const role = $("reg_role").value;
-      $("brokerMCWrap").style.display = (role === "broker") ? "block" : "none";
+      $("brokerMcWrap").style.display = (role === "broker") ? "block" : "none";
     }
 
-    async function apiPOST(path, body){
+    async function apiPOST(path, body, token){
+      const headers = { "Content-Type": "application/json" };
+      if(token) headers["Authorization"] = "Bearer " + token;
       const res = await fetch(path, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(body || {})
       });
       const j = await res.json().catch(()=>null);
@@ -651,67 +635,35 @@
       return j;
     }
 
-    function setAuth(token, username, role, broker_status, broker_mc){
+    function setAuth(token, username, role){
       if(token) localStorage.setItem("token", token);
       if(username) localStorage.setItem("username", username);
       if(role) localStorage.setItem("role", role);
-      if(broker_status != null) localStorage.setItem("broker_status", broker_status);
-      if(broker_mc != null) localStorage.setItem("broker_mc", broker_mc);
     }
 
     function goToRole(role){
       if(role === "dispatcher") location.href = "/dispatcher-ui";
       else if(role === "driver") location.href = "/driver-ui";
-      else if(role === "broker") location.href = "/broker-ui";
       else location.href = "/broker-ui";
-    }
-
-    async function forgotPassword(){
-      const email = prompt("Enter the email on your account to request a password reset:");
-      if(!email) return;
-      try{
-        await apiPOST("/password-reset/request", { email: String(email).trim() });
-        showMsg("ok", "Password reset request sent (if that email exists). Check your inbox.");
-      }catch(e){
-        showMsg("err", "Password reset failed: " + (e?.message || e));
-      }
     }
 
     async function doLogin(){
       const u = ($("login_user").value || "").trim();
       const p = ($("login_pass").value || "").trim();
-      const remember = $("rememberUser").checked;
+      const role = $("login_role").value;
 
       if(!u || !p){
-        showMsg("err","Enter your User ID and Password.");
+        showMsg("err","Enter username and password.");
         return;
       }
-
-      try{
-        if(remember) localStorage.setItem("remember_user", u);
-        else localStorage.removeItem("remember_user");
-      }catch(e){}
 
       $("loginBtn").disabled = true;
       try{
         const j = await apiPOST("/login", { username: u, password: p });
-
-        if(!j || !j.token) throw new Error("Login did not return a token.");
-
-        // Use server-provided role/status (correct behavior)
-        const role = j.role || "";
-        const broker_status = j.broker_status ?? null;
-        const broker_mc = j.broker_mc ?? null;
-
-        setAuth(j.token, u, role, broker_status, broker_mc);
-
-        if(role === "broker" && broker_status && broker_status !== "approved"){
-          showMsg("err", "Broker account is " + broker_status + ". You can’t access broker tools until approved.");
-          return;
-        }
-
+        if(!j || !j.token) throw new Error("Login did not return a token");
+        setAuth(j.token, u, role);
         showMsg("ok","Logged in. Redirecting…");
-        setTimeout(()=>goToRole(role), 500);
+        setTimeout(()=>goToRole(role), 450);
       }catch(e){
         showMsg("err","Login failed: " + (e?.message || e));
       }finally{
@@ -724,10 +676,10 @@
       const p = ($("reg_pass").value || "").trim();
       const p2 = ($("reg_pass2").value || "").trim();
       const role = $("reg_role").value;
-      const broker_mc = ($("reg_broker_mc").value || "").trim();
+      const mc = ($("reg_mc").value || "").trim();
 
       if(!u || !p){
-        showMsg("err","Enter a User ID and Password.");
+        showMsg("err","Enter username and password.");
         return;
       }
       if(p.length < 8){
@@ -738,34 +690,21 @@
         showMsg("err","Passwords do not match.");
         return;
       }
-      if(role === "broker" && !broker_mc){
-        showMsg("err","Broker MC Number is required for broker accounts.");
+      if(role === "broker" && !mc){
+        showMsg("err","Broker MC# is required.");
         return;
       }
 
       $("regBtn").disabled = true;
       try{
-        const payload = { username: u, password: p, role: role };
-        if(role === "broker") payload.broker_mc = broker_mc;
-
+        const payload = { username: u, password: p, role };
+        if(role === "broker") payload["broker_mc"] = mc;
         await apiPOST("/register", payload);
-
         showMsg("ok","Account created. Logging you in…");
         const j = await apiPOST("/login", { username: u, password: p });
-        if(!j || !j.token) throw new Error("Login did not return a token.");
-
-        const serverRole = j.role || role;
-        const broker_status = j.broker_status ?? null;
-        const broker_mc2 = j.broker_mc ?? (role === "broker" ? broker_mc : null);
-
-        setAuth(j.token, u, serverRole, broker_status, broker_mc2);
-
-        if(serverRole === "broker" && broker_status && broker_status !== "approved"){
-          showMsg("ok", "Broker account created and is pending approval. You can still test non-broker areas.");
-          return;
-        }
-
-        setTimeout(()=>goToRole(serverRole), 650);
+        if(!j || !j.token) throw new Error("Login did not return a token");
+        setAuth(j.token, u, role);
+        setTimeout(()=>goToRole(role), 650);
       }catch(e){
         showMsg("err","Create account failed: " + (e?.message || e));
       }finally{
@@ -773,13 +712,71 @@
       }
     }
 
-    // Enter key support (classic)
+    async function requestReset(){
+      const who = ($("rst_user").value || "").trim();
+      if(!who){
+        showMsg("err","Enter username or email.");
+        return;
+      }
+      $("rstReqBtn").disabled = true;
+      try{
+        const j = await apiPOST("/password-reset/request", { username_or_email: who });
+        // If backend returns token for testing, auto-fill
+        if(j && j.reset_token){
+          $("rst_token").value = j.reset_token;
+          showMsg("ok","Reset token generated (dev mode). Paste into the token field and set a new password.");
+        }else{
+          showMsg("ok","If the account exists, a reset token has been sent.");
+        }
+      }catch(e){
+        showMsg("err","Reset request failed: " + (e?.message || e));
+      }finally{
+        $("rstReqBtn").disabled = false;
+      }
+    }
+
+    async function confirmReset(){
+      const token = ($("rst_token").value || "").trim();
+      const p = ($("rst_pass").value || "").trim();
+      const p2 = ($("rst_pass2").value || "").trim();
+
+      if(!token){
+        showMsg("err","Enter the reset token.");
+        return;
+      }
+      if(!p || p.length < 8){
+        showMsg("err","New password must be at least 8 characters.");
+        return;
+      }
+      if(p !== p2){
+        showMsg("err","Passwords do not match.");
+        return;
+      }
+
+      $("rstConfBtn").disabled = true;
+      try{
+        await apiPOST("/password-reset/confirm", { token, new_password: p });
+        showMsg("ok","Password updated. Go back and log in.");
+        setTimeout(()=>showTab("login"), 900);
+      }catch(e){
+        showMsg("err","Reset confirm failed: " + (e?.message || e));
+      }finally{
+        $("rstConfBtn").disabled = false;
+      }
+    }
+
+    // Enter key support
     document.addEventListener("keydown", (ev)=>{
       if(ev.key !== "Enter") return;
       const createVisible = $("createPane").style.display !== "none";
-      if(createVisible) doRegister();
+      const resetVisible = $("resetPane").style.display !== "none";
+      if(resetVisible) confirmReset();
+      else if(createVisible) doRegister();
       else doLogin();
     });
+
+    // default
+    showTab("login");
   </script>
 </body>
 </html>
