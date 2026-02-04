@@ -1,59 +1,54 @@
-from fastapi import FastAPI, Depends, HTTPException
+from __future__ import annotations
+
+import importlib
+import os
+
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from auth import authenticate_user, create_user, create_token, get_current_user
-from fmcsa import lookup_mc
 
-app = FastAPI(title="Chequmate Freight System")
+app = FastAPI(title="Chequmate Freight System", version="0.1.0")
 
-# -------------------------------------------------
-# STATIC FILES
-# -------------------------------------------------
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Static mounts (keep traditional structure)
+if os.path.isdir("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+if os.path.isdir(".well-known"):
+    app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
 
-# -------------------------------------------------
-# ROUTES
-# -------------------------------------------------
+
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse("static/favicon.ico")
+
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    return open("static/login.html").read()
+    return open("static/login.html", encoding="utf-8").read()
 
-@app.get("/register")
-def register(username: str, password: str):
-    return create_user(username, password)
 
-@app.get("/login")
-def login(username: str, password: str):
-    user = authenticate_user(username, password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+def _try_include(module_name: str, router_attr: str = "router") -> None:
+    try:
+        mod = importlib.import_module(module_name)
+        router = getattr(mod, router_attr)
+        app.include_router(router)
+        print(f"[boot] included router: {module_name}.{router_attr}")
+    except Exception as e:
+        print(f"[boot] WARNING: could not include {module_name}.{router_attr}: {e!r}")
 
-    token = create_token({"sub": user["username"], "role": user["role"]})
-    return {"access_token": token, "role": user["role"]}
 
-# -------------------------------------------------
-# PROTECTED: DISPATCHER PANEL
-# -------------------------------------------------
-from fastapi.responses import FileResponse
+# Core API / routers (include whatever exists in your repo)
+_try_include("auth")            # login/register if you have it
+_try_include("loads")           # if your loads routes live here
+_try_include("broker")          # if broker routes are here
+_try_include("driver")          # if driver routes are here
+_try_include("dispatcher")      # if dispatcher routes are here
 
-@app.get("/dispatcher-panel")
-def dispatcher_panel():
-    return FileResponse("static/dispatcher.html")
+# Features we KNOW you have
+_try_include("fuel")
+_try_include("negotiate")
+_try_include("broker_ui")
 
-# -------------------------------------------------
-# BROKER LOOKUP (LOGGED IN USERS ONLY)
-# -------------------------------------------------
-@app.get("/verify-broker")
-def verify_broker(mc_number: str, user=Depends(get_current_user)):
-    result = lookup_mc(mc_number)
-    return result
-
-# -------------------------------------------------
-# VERIFY TOKEN
-# -------------------------------------------------
-@app.get("/verify-token")
-def verify_token(user=Depends(get_current_user)):
-    return {"username": user["username"], "role": user["role"]}
-
+# Add the missing UI pages (fixes your 404s)
+_try_include("driver_ui")
+_try_include("dispatcher_ui")
