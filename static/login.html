@@ -6,22 +6,16 @@
   <title>Chequmate — Login</title>
   <style>
     :root{
-      /* Use your existing dark app palette (matches broker/dispatcher/driver look) */
-      --bg:#0e1426;
-      --panel: rgba(17,26,51,.92);
-      --panel2: rgba(15,24,48,.95);
-      --text:#e6ecff;
-      --muted:#9aa7cc;
-      --border: rgba(255,255,255,.10);
-      --shadow: 0 18px 46px rgba(0,0,0,.55);
-      --radius: 14px;
+      --bg:#0b1020;
+      --panel: rgba(18,26,51,.82);
+      --text:#e8eeff;
+      --muted:#a8b3d6;
+      --border: rgba(255,255,255,.12);
+      --shadow: 0 18px 46px rgba(0,0,0,.50);
+      --radius: 16px;
 
-      /* Brand accents (kept restrained, not BOA-ish) */
-      --brand:#2f5cff;
-      --brand2:#1e3fa8;
-
-      --danger:#ff4d4d;
-      --ok:#36d27e;
+      --brand:#4dd2ff;
+      --brand2:#3b82f6;
 
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
       --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
@@ -33,79 +27,46 @@
       font-family: var(--sans);
       color: var(--text);
       background:
-        radial-gradient(900px 500px at 15% 0%, rgba(47,92,255,0.16), transparent 55%),
-        radial-gradient(900px 500px at 90% 10%, rgba(30,63,168,0.16), transparent 55%),
+        radial-gradient(1200px 650px at 15% 0%, rgba(77,210,255,0.14), transparent 55%),
+        radial-gradient(1000px 600px at 90% 10%, rgba(59,130,246,0.12), transparent 55%),
+        radial-gradient(900px 500px at 40% 100%, rgba(255,210,77,0.08), transparent 55%),
         var(--bg);
       min-height:100vh;
     }
 
-    .wrap{
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 28px 16px 22px;
-    }
+    .wrap{ max-width: 1100px; margin: 0 auto; padding: 28px 16px 22px; }
 
-    .brandbar{
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      margin: 10px 0 18px;
-    }
+    .brandbar{ display:flex; align-items:center; justify-content:center; margin: 10px 0 18px; }
+    .brand{ display:flex; align-items:center; gap:12px; user-select:none; }
 
-    .brand{
-      display:flex;
-      align-items:center;
-      gap:12px;
-      user-select:none;
-    }
-
-    .logoBox{
-      width:56px;height:56px;
-      border-radius:14px;
+    .logoMark{
+      width:42px;height:42px;
+      border-radius:12px;
       border:1px solid var(--border);
-      background: rgba(255,255,255,.04);
+      background: rgba(255,255,255,.06);
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
       display:grid;
       place-items:center;
       overflow:hidden;
     }
-    .logoBox img{
-      width:100%;
-      height:100%;
-      object-fit:contain;
-      display:block;
-      padding:8px;
-    }
-    .logoFallback{
-      display:none;
-      width:100%;
-      height:100%;
-      align-items:center;
-      justify-content:center;
-      font-weight:900;
+    .logoMark img{ width:100%; height:100%; object-fit:contain; display:block; padding:6px; }
+    .logoMarkFallback{
       font-family: var(--mono);
-      letter-spacing:.5px;
-      background: linear-gradient(135deg, var(--brand), var(--brand2));
+      font-weight: 900;
+      letter-spacing: .6px;
+      font-size: 14px;
+      color: rgba(232,238,255,.92);
     }
 
-    .wordmark{
-      font-weight: 900;
-      letter-spacing: 3px;
-      font-size: 34px;
-      text-transform: uppercase;
-      line-height:1;
-    }
-    .tagline{
-      margin-top:6px;
-      color: var(--muted);
-      font-size: 13px;
-      letter-spacing:.2px;
-    }
+    .wordmark{ font-weight: 900; letter-spacing: 3px; font-size: 34px; text-transform: uppercase; }
+    .tagline{ margin-top:4px; color: var(--muted); font-size: 13px; letter-spacing:.2px; }
 
     .panel{
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
       padding: 18px;
     }
 
@@ -115,28 +76,12 @@
       gap: 16px;
       align-items: stretch;
     }
-    @media (max-width: 900px){
-      .grid{ grid-template-columns: 1fr; }
-    }
+    @media (max-width: 900px){ .grid{ grid-template-columns: 1fr; } }
 
-    .h1{
-      font-weight: 900;
-      font-size: 18px;
-      margin: 0 0 10px;
-    }
-    .sub{
-      color: var(--muted);
-      font-size: 13px;
-      margin: 0 0 16px;
-      line-height: 1.35;
-    }
+    .h1{ font-weight: 900; font-size: 18px; margin: 0 0 10px; }
+    .sub{ color: var(--muted); font-size: 13px; margin: 0 0 16px; line-height: 1.35; }
 
-    .tabs{
-      display:flex;
-      gap:10px;
-      margin: 6px 0 14px;
-      flex-wrap:wrap;
-    }
+    .tabs{ display:flex; gap:10px; margin: 6px 0 14px; }
     .tab{
       border: 1px solid var(--border);
       background: rgba(255,255,255,.06);
@@ -144,14 +89,14 @@
       border-radius: 999px;
       cursor:pointer;
       color: var(--muted);
-      font-weight: 900;
+      font-weight: 800;
       font-size: 12px;
       letter-spacing: .4px;
     }
     .tab.active{
-      background: rgba(47,92,255,.18);
+      background: rgba(77,210,255,.14);
       color: var(--text);
-      border-color: rgba(47,92,255,.30);
+      border-color: rgba(77,210,255,.25);
     }
 
     label{
@@ -159,7 +104,7 @@
       font-size: 12px;
       color: var(--muted);
       margin: 10px 0 6px;
-      font-weight: 800;
+      font-weight: 700;
       letter-spacing: .2px;
     }
 
@@ -168,21 +113,15 @@
       padding: 12px 12px;
       border-radius: 12px;
       border: 1px solid var(--border);
-      background: var(--panel2);
+      background: rgba(15,23,48,.92);
       color: var(--text);
       outline: none;
       font-size: 14px;
     }
-    input::placeholder{ color: rgba(154,167,204,.78); }
+    input::placeholder{ color: rgba(168,179,214,.70); }
 
-    .row{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-    @media (max-width: 520px){
-      .row{ grid-template-columns: 1fr; }
-    }
+    .row{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 520px){ .row{ grid-template-columns: 1fr; } }
 
     .actions{
       display:flex;
@@ -190,12 +129,11 @@
       justify-content:space-between;
       gap: 12px;
       margin-top: 12px;
-      flex-wrap:wrap;
     }
     .link{
-      color: rgba(230,236,255,.88);
+      color: rgba(232,238,255,.88);
       text-decoration: none;
-      font-weight: 900;
+      font-weight: 800;
       font-size: 12px;
       opacity: .85;
     }
@@ -206,18 +144,13 @@
       cursor:pointer;
       font-weight: 900;
       letter-spacing: .2px;
-      background: linear-gradient(135deg, rgba(47,92,255,.95), rgba(30,63,168,.95));
-      border: 1px solid rgba(47,92,255,.28);
+      background: linear-gradient(135deg, rgba(77,210,255,.20), rgba(59,130,246,.22));
+      border: 1px solid rgba(77,210,255,.22);
     }
     .btn:hover{ filter: brightness(1.05); }
     .btn:disabled{ opacity:.5; cursor:not-allowed; }
 
-    .smallnote{
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.35;
-    }
+    .smallnote{ margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 
     .msg{
       margin-top: 12px;
@@ -231,39 +164,23 @@
       white-space: pre-wrap;
       overflow-wrap:anywhere;
     }
-    .msg.ok{ border-color: rgba(54,210,126,.30); color: rgba(230,236,255,.95); }
-    .msg.err{ border-color: rgba(255,77,77,.30); color: rgba(255,210,210,.95); }
+    .msg.ok{ border-color: rgba(77,255,136,.22); color: rgba(232,238,255,.92); }
+    .msg.err{ border-color: rgba(255,77,77,.26); color: rgba(255,210,210,.95); }
 
-    .promo{
-      display:flex;
-      flex-direction:column;
-      justify-content:space-between;
-      gap: 14px;
-      height: 100%;
-    }
+    .promo{ display:flex; flex-direction:column; justify-content:space-between; gap: 14px; height: 100%; }
     .promoTop{
       border:1px solid var(--border);
       border-radius: 14px;
-      background: rgba(255,255,255,.04);
+      background: rgba(255,255,255,.05);
       padding: 14px;
     }
-    .promoTitle{
-      font-weight: 900;
-      margin: 0 0 6px;
-      font-size: 14px;
-      letter-spacing: .2px;
-    }
-    .promoText{
-      margin: 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.4;
-    }
+    .promoTitle{ font-weight: 900; margin: 0 0 6px; font-size: 14px; letter-spacing: .2px; }
+    .promoText{ margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
     .phoneBox{
       margin-top: 12px;
       border-radius: 14px;
       border: 1px dashed rgba(255,255,255,.16);
-      background: rgba(15,24,48,.75);
+      background: rgba(15,23,48,.75);
       padding: 12px;
       display:flex;
       gap: 12px;
@@ -274,45 +191,30 @@
       height: 160px;
       border-radius: 14px;
       border: 1px solid rgba(255,255,255,.14);
-      background: linear-gradient(180deg, rgba(47,92,255,.16), rgba(30,63,168,.10));
+      background: linear-gradient(180deg, rgba(77,210,255,.16), rgba(59,130,246,.10));
       display:grid;
       place-items:center;
       overflow:hidden;
       flex: 0 0 auto;
     }
-    .phoneImg img{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      display:block;
-      opacity:.95;
-    }
+    .phoneImg img{ width:100%; height:100%; object-fit:cover; display:block; opacity:.95; }
     .phoneFallback{
       padding: 10px;
       text-align:center;
-      color: rgba(230,236,255,.90);
+      color: rgba(232,238,255,.88);
       font-weight: 900;
       letter-spacing: 1px;
       font-size: 12px;
     }
-
-    .storeBtns{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 12px;
-    }
+    .storeBtns{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
     .storeBtn{
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap: 8px;
+      display:flex; align-items:center; justify-content:center; gap: 8px;
       padding: 12px;
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(255,255,255,.06);
       text-decoration:none;
-      color: rgba(230,236,255,.92);
+      color: rgba(232,238,255,.92);
       font-weight: 900;
       font-size: 12px;
       letter-spacing:.3px;
@@ -336,15 +238,10 @@
       align-items:center;
       justify-content:space-between;
       gap: 12px;
-      color: rgba(154,167,204,.90);
+      color: rgba(168,179,214,.85);
       font-size: 12px;
     }
-    .secure{
-      display:flex;
-      align-items:center;
-      gap: 8px;
-      opacity:.9;
-    }
+    .secure{ display:flex; align-items:center; gap: 8px; opacity:.9; }
     .lock{
       width: 10px;height:10px;
       border-radius: 2px;
@@ -361,29 +258,15 @@
       border-bottom:none;
       border-radius: 8px 8px 0 0;
     }
-    .footLinks{
-      display:flex;
-      align-items:center;
-      gap: 10px;
-      flex-wrap:wrap;
-      justify-content:flex-end;
-    }
+    .footLinks{ display:flex; align-items:center; gap: 10px; flex-wrap:wrap; justify-content:flex-end; }
     .footLinks a{
-      color: rgba(154,167,204,.95);
+      color: rgba(168,179,214,.90);
       text-decoration:none;
-      font-weight: 900;
+      font-weight: 800;
       font-size: 12px;
       opacity:.85;
     }
     .footLinks a:hover{ opacity: 1; text-decoration: underline; }
-
-    /* small reset pane helper */
-    .hint{
-      color: var(--muted);
-      font-size: 12px;
-      margin-top: 8px;
-      line-height:1.35;
-    }
   </style>
 </head>
 
@@ -391,11 +274,10 @@
   <div class="wrap">
     <div class="brandbar">
       <div class="brand" aria-label="Chequmate">
-        <div class="logoBox" title="Chequmate">
-          <!-- REAL LOGO (you already have this in /webapp/assets/) -->
-          <img src="/webapp/assets/chequmate-logo.png" alt="Chequmate"
-               onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex';">
-          <div class="logoFallback" id="logoFallback">CQ</div>
+        <div class="logoMark" title="Chequmate">
+          <img src="/static/chequmate_logo.png" alt="Chequmate logo"
+               onerror="this.remove();document.getElementById('logoFallback').style.display='block';">
+          <div id="logoFallback" class="logoMarkFallback" style="display:none;">CQ</div>
         </div>
         <div>
           <div class="wordmark">CHEQUMATE</div>
@@ -406,7 +288,7 @@
 
     <div class="panel">
       <div class="grid">
-        <!-- LEFT: Auth -->
+        <!-- LEFT -->
         <div>
           <div class="h1">Log in</div>
           <p class="sub">Access secure load boards, assignments, and tools.</p>
@@ -417,7 +299,7 @@
             <button class="tab" id="tabReset" onclick="showTab('reset')" type="button">RESET PASSWORD</button>
           </div>
 
-          <!-- LOGIN FORM -->
+          <!-- LOGIN -->
           <div id="loginPane">
             <label for="login_user">Username</label>
             <input id="login_user" autocomplete="username" placeholder="username" />
@@ -440,17 +322,20 @@
             </div>
 
             <div class="smallnote">
-              Testing note: token is stored in your browser for now (dev behavior).
+              Note: for development, auth is stored in the browser. We can move to httpOnly cookies later.
             </div>
           </div>
 
-          <!-- CREATE ACCOUNT FORM -->
+          <!-- CREATE -->
           <div id="createPane" style="display:none;">
             <div class="h1" style="margin-top:2px;">Create account</div>
-            <p class="sub" style="margin-bottom:12px;">Choose a role. Brokers must enter MC# (verification required).</p>
+            <p class="sub" style="margin-bottom:12px;">Email is required so password reset works.</p>
 
             <label for="reg_user">Username</label>
             <input id="reg_user" autocomplete="username" placeholder="choose a username" />
+
+            <label for="reg_email">Email</label>
+            <input id="reg_email" type="email" autocomplete="email" placeholder="name@example.com" />
 
             <div class="row">
               <div>
@@ -470,10 +355,10 @@
               <option value="driver">Driver</option>
             </select>
 
-            <div id="brokerMcWrap" style="display:block;">
+            <div id="mcWrap">
               <label for="reg_mc">Broker MC#</label>
               <input id="reg_mc" placeholder="MC123456" />
-              <div class="hint">Brokers start as <b>pending</b> until approved. Dispatchers/drivers don’t need MC#.</div>
+              <div class="smallnote">Brokers start as <b>pending</b> until approved. Dispatchers/drivers don’t need MC#.</div>
             </div>
 
             <button class="btn" id="regBtn" onclick="doRegister()" type="button">Create Account</button>
@@ -484,39 +369,19 @@
             </div>
           </div>
 
-          <!-- RESET PASSWORD -->
+          <!-- RESET -->
           <div id="resetPane" style="display:none;">
             <div class="h1" style="margin-top:2px;">Reset password</div>
-            <p class="sub" style="margin-bottom:12px;">
-              Request a reset token, then confirm it with a new password.
-            </p>
+            <p class="sub" style="margin-bottom:12px;">Enter your username. We’ll email a reset link to the address on file.</p>
 
-            <label for="rst_user">Username or Email</label>
-            <input id="rst_user" placeholder="username or email" />
+            <label for="fp_user">Username</label>
+            <input id="fp_user" placeholder="username" />
 
-            <button class="btn" id="rstReqBtn" onclick="requestReset()" type="button">Send Reset Token</button>
+            <button class="btn" id="fpBtn" onclick="doForgot()" type="button">Send Reset Email</button>
 
-            <div class="hint">
-              If email is configured, the token is emailed. For dev/testing, the API may return it directly.
+            <div class="smallnote">
+              If your account was created without an email, log in on a device where you’re still signed in and set your email, or contact admin.
             </div>
-
-            <hr style="border:none;border-top:1px solid rgba(255,255,255,.10); margin:14px 0;">
-
-            <label for="rst_token">Reset token</label>
-            <input id="rst_token" placeholder="paste token here" />
-
-            <div class="row">
-              <div>
-                <label for="rst_pass">New password</label>
-                <input id="rst_pass" type="password" placeholder="new password" />
-              </div>
-              <div>
-                <label for="rst_pass2">Confirm new password</label>
-                <input id="rst_pass2" type="password" placeholder="confirm" />
-              </div>
-            </div>
-
-            <button class="btn" id="rstConfBtn" onclick="confirmReset()" type="button">Set New Password</button>
 
             <div class="actions">
               <a class="link" href="#" onclick="showTab('login'); return false;">Back to login</a>
@@ -527,18 +392,16 @@
           <div id="msg" class="msg"></div>
         </div>
 
-        <!-- RIGHT: Promo -->
+        <!-- RIGHT -->
         <div class="promo">
           <div class="promoTop">
             <div class="promoTitle">Stay connected with the Chequmate app</div>
-            <p class="promoText">
-              Dispatch updates, load details, and pay tools — built for fast decisions and clean paperwork.
-            </p>
+            <p class="promoText">Dispatch updates, load details, and pay tools — built for fast decisions and clean paperwork.</p>
 
             <div class="phoneBox" aria-label="App promo">
               <div class="phoneImg" title="Chequmate mobile preview">
-                <!-- optional image: static/app_preview.png -->
-                <img src="/static/app_preview.png" alt="" onerror="this.remove();document.getElementById('phoneFallback').style.display='block';">
+                <img src="/static/app_preview.png" alt=""
+                     onerror="this.remove();document.getElementById('phoneFallback').style.display='block';">
                 <div class="phoneFallback" id="phoneFallback" style="display:none;">CHEQUMATE<br/>MOBILE</div>
               </div>
               <div style="flex:1;min-width:0;">
@@ -556,8 +419,7 @@
           </div>
 
           <div class="promoBottom">
-            <b>Tip:</b> Create separate accounts for broker/dispatcher/driver during testing.
-            It keeps permissions clean and avoids “Forbidden” surprises.
+            <b>Tip:</b> Create separate accounts for broker/dispatcher/driver during testing to keep permissions clean.
           </div>
         </div>
       </div>
@@ -595,36 +457,27 @@
     }
 
     function showTab(which){
-      const panes = ["loginPane","createPane","resetPane"];
-      panes.forEach(p => $(p).style.display = "none");
+      $("loginPane").style.display = (which==="login") ? "block" : "none";
+      $("createPane").style.display = (which==="create") ? "block" : "none";
+      $("resetPane").style.display  = (which==="reset") ? "block" : "none";
 
-      ["tabLogin","tabCreate","tabReset"].forEach(t => $(t).classList.remove("active"));
+      $("tabLogin").classList.toggle("active", which==="login");
+      $("tabCreate").classList.toggle("active", which==="create");
+      $("tabReset").classList.toggle("active", which==="reset");
+
       $("msg").style.display = "none";
-
-      if(which === "create"){
-        $("createPane").style.display = "block";
-        $("tabCreate").classList.add("active");
-        toggleBrokerMC();
-      }else if(which === "reset"){
-        $("resetPane").style.display = "block";
-        $("tabReset").classList.add("active");
-      }else{
-        $("loginPane").style.display = "block";
-        $("tabLogin").classList.add("active");
-      }
+      if(which==="create") toggleBrokerMC();
     }
 
     function toggleBrokerMC(){
       const role = $("reg_role").value;
-      $("brokerMcWrap").style.display = (role === "broker") ? "block" : "none";
+      $("mcWrap").style.display = (role === "broker") ? "block" : "none";
     }
 
-    async function apiPOST(path, body, token){
-      const headers = { "Content-Type": "application/json" };
-      if(token) headers["Authorization"] = "Bearer " + token;
+    async function apiPOST(path, body){
       const res = await fetch(path, {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body || {})
       });
       const j = await res.json().catch(()=>null);
@@ -652,10 +505,7 @@
       const p = ($("login_pass").value || "").trim();
       const role = $("login_role").value;
 
-      if(!u || !p){
-        showMsg("err","Enter username and password.");
-        return;
-      }
+      if(!u || !p){ showMsg("err","Enter username and password."); return; }
 
       $("loginBtn").disabled = true;
       try{
@@ -663,7 +513,7 @@
         if(!j || !j.token) throw new Error("Login did not return a token");
         setAuth(j.token, u, role);
         showMsg("ok","Logged in. Redirecting…");
-        setTimeout(()=>goToRole(role), 450);
+        setTimeout(()=>goToRole(role), 500);
       }catch(e){
         showMsg("err","Login failed: " + (e?.message || e));
       }finally{
@@ -673,32 +523,21 @@
 
     async function doRegister(){
       const u = ($("reg_user").value || "").trim();
+      const email = ($("reg_email").value || "").trim();
       const p = ($("reg_pass").value || "").trim();
       const p2 = ($("reg_pass2").value || "").trim();
       const role = $("reg_role").value;
       const mc = ($("reg_mc").value || "").trim();
 
-      if(!u || !p){
-        showMsg("err","Enter username and password.");
-        return;
-      }
-      if(p.length < 8){
-        showMsg("err","Password must be at least 8 characters.");
-        return;
-      }
-      if(p !== p2){
-        showMsg("err","Passwords do not match.");
-        return;
-      }
-      if(role === "broker" && !mc){
-        showMsg("err","Broker MC# is required.");
-        return;
-      }
+      if(!u || !email || !p){ showMsg("err","Username, email, and password are required."); return; }
+      if(p.length < 8){ showMsg("err","Password must be at least 8 characters."); return; }
+      if(p !== p2){ showMsg("err","Passwords do not match."); return; }
+
+      const payload = { username: u, password: p, role: role, email: email };
+      if(role === "broker") payload.broker_mc = mc;
 
       $("regBtn").disabled = true;
       try{
-        const payload = { username: u, password: p, role };
-        if(role === "broker") payload["broker_mc"] = mc;
         await apiPOST("/register", payload);
         showMsg("ok","Account created. Logging you in…");
         const j = await apiPOST("/login", { username: u, password: p });
@@ -712,71 +551,30 @@
       }
     }
 
-    async function requestReset(){
-      const who = ($("rst_user").value || "").trim();
-      if(!who){
-        showMsg("err","Enter username or email.");
-        return;
-      }
-      $("rstReqBtn").disabled = true;
+    async function doForgot(){
+      const u = ($("fp_user").value || "").trim();
+      if(!u){ showMsg("err","Enter your username."); return; }
+
+      $("fpBtn").disabled = true;
       try{
-        const j = await apiPOST("/password-reset/request", { username_or_email: who });
-        // If backend returns token for testing, auto-fill
-        if(j && j.reset_token){
-          $("rst_token").value = j.reset_token;
-          showMsg("ok","Reset token generated (dev mode). Paste into the token field and set a new password.");
-        }else{
-          showMsg("ok","If the account exists, a reset token has been sent.");
-        }
+        await apiPOST("/forgot-password", { username: u });
+        showMsg("ok","If that username exists and has an email on file, a reset link has been sent.");
       }catch(e){
         showMsg("err","Reset request failed: " + (e?.message || e));
       }finally{
-        $("rstReqBtn").disabled = false;
+        $("fpBtn").disabled = false;
       }
     }
 
-    async function confirmReset(){
-      const token = ($("rst_token").value || "").trim();
-      const p = ($("rst_pass").value || "").trim();
-      const p2 = ($("rst_pass2").value || "").trim();
-
-      if(!token){
-        showMsg("err","Enter the reset token.");
-        return;
-      }
-      if(!p || p.length < 8){
-        showMsg("err","New password must be at least 8 characters.");
-        return;
-      }
-      if(p !== p2){
-        showMsg("err","Passwords do not match.");
-        return;
-      }
-
-      $("rstConfBtn").disabled = true;
-      try{
-        await apiPOST("/password-reset/confirm", { token, new_password: p });
-        showMsg("ok","Password updated. Go back and log in.");
-        setTimeout(()=>showTab("login"), 900);
-      }catch(e){
-        showMsg("err","Reset confirm failed: " + (e?.message || e));
-      }finally{
-        $("rstConfBtn").disabled = false;
-      }
-    }
-
-    // Enter key support
     document.addEventListener("keydown", (ev)=>{
       if(ev.key !== "Enter") return;
-      const createVisible = $("createPane").style.display !== "none";
-      const resetVisible = $("resetPane").style.display !== "none";
-      if(resetVisible) confirmReset();
-      else if(createVisible) doRegister();
-      else doLogin();
+      if($("resetPane").style.display !== "none") return doForgot();
+      if($("createPane").style.display !== "none") return doRegister();
+      return doLogin();
     });
 
-    // default
-    showTab("login");
+    // default state
+    toggleBrokerMC();
   </script>
 </body>
 </html>
