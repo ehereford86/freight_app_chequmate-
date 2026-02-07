@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import sqlite3
 import smtplib
 from datetime import datetime, timedelta
 from email.message import EmailMessage
@@ -17,7 +16,7 @@ import db
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-JWT_SECRET = os.environ.get("SECRET_KEY", "dev-secret")
+JWT_SECRET = (os.environ.get("SECRET_KEY") or "dev-secret").strip()
 JWT_ALGO = "HS256"
 
 ACCESS_EXP_HOURS = 24
@@ -25,31 +24,8 @@ RESET_EXP_MIN = 30
 
 
 # -------------------
-# DB helpers
+# Password hashing
 # -------------------
-def _connect() -> sqlite3.Connection:
-    con = sqlite3.connect(db.DB_PATH)
-    con.row_factory = sqlite3.Row
-    return con
-
-
-def _init_schema(con: sqlite3.Connection) -> None:
-    con.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            email TEXT,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL,
-            broker_status TEXT DEFAULT 'none',
-            broker_mc TEXT,
-            created_at TEXT NOT NULL
-        )
-        """
-    )
-    con.commit()
-
-
 def _hash(pw: str) -> str:
     return pwd_context.hash(pw)
 
@@ -122,7 +98,7 @@ def _decode_reset(token: str) -> str:
         data = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
         if data.get("scope") != "password_reset":
             raise ValueError("bad scope")
-        return data["username"]
+        return str(data["username"])
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
@@ -163,20 +139,19 @@ def _role_check(user: Dict[str, Any], role: str) -> Dict[str, Any]:
 
 def require_role(*args):
     """
-    Supports all patterns we’ve had over time:
+    Supports multiple call styles:
 
-    1) NEW dependency factory:
+    1) Dependency factory:
        dep = require_role("admin")
        def route(user=Depends(dep)): ...
 
-    2) OLD direct check:
+    2) Direct check:
        require_role(user_dict, "admin")
 
-    3) LEGACY “weird” style used in some modules:
+    3) Legacy odd style:
        require_role(Depends(get_current_user), "admin")
-       (This happens at import time and must NOT crash.)
+       (must not crash at import time)
     """
-    # Style 1: require_role("admin")
     if len(args) == 1:
         role = (args[0] or "").strip().lower()
 
@@ -185,13 +160,10 @@ def require_role(*args):
 
         return _dep
 
-    # Styles 2/3: require_role(x, "admin")
     if len(args) == 2:
         first, role = args
         role = (str(role) or "").strip().lower()
 
-        # If caller passed a Depends object (or anything non-dict) at import time,
-        # treat it as a request for a dependency function instead of crashing.
         if not isinstance(first, dict):
             def _dep(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
                 return _role_check(user, role)
@@ -253,118 +225,154 @@ class ResetReq(BaseModel):
     new_password: str
 
 
+class SetEmailReq(BaseModel):
+    email: EmailStr
+
+
 # -------------------
 # Routes
 # -------------------
+@router.get("/verify-token")
+def verify_token(u: Dict[str, Any] = Depends(get_current_user)):
+    return {"ok": True, "user": u}
+
+
+@router.post("/me/set-email")
+async def me_set_email(request: Request, u: Dict[str, Any] = Depends(get_current_user)):
+    body = await read_json(request)
+    email = (body.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Valid email required")
+    try:
+        db.set_email(u["username"], email)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to set email: {e}")
+    return {"ok": True, "username": u["username"], "email": email}
+
+
 @router.post("/register")
 def register(body: RegisterReq):
-    username = body.username.strip()
-    role = body.role.strip().lower()
+    username = (body.username or "").strip()
+    role = (body.role or "").strip().lower()
 
     if not username:
         raise HTTPException(status_code=400, detail="Username required")
-    if len(body.password) < 8:
+    if len(body.password or "") < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-
     if role not in {"driver", "dispatcher", "broker", "admin"}:
         raise HTTPException(status_code=400, detail="Invalid role")
 
+    existing = db.get_user(username)
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
     broker_status = "none"
     broker_mc = None
+
     if role == "broker":
-        if not body.broker_mc or not body.broker_mc.strip():
+        broker_mc = (body.broker_mc or "").strip()
+        if not broker_mc:
             raise HTTPException(status_code=400, detail="broker_mc required for brokers")
         broker_status = "pending"
-        broker_mc = body.broker_mc.strip()
 
-    con = _connect()
     try:
-        _init_schema(con)
-
-        existing = con.execute("SELECT username FROM users WHERE username=?", (username,)).fetchone()
-        if existing:
-            raise HTTPException(status_code=400, detail="Username already exists")
-
-        con.execute(
-            """
-            INSERT INTO users (username, email, password_hash, role, broker_status, broker_mc, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                username,
-                str(body.email).strip().lower() if body.email else None,
-                _hash(body.password),
-                role,
-                broker_status,
-                broker_mc,
-                datetime.utcnow().isoformat(),
-            ),
+        db.create_user(
+            username=username,
+            password_hash=_hash(body.password),
+            role=role,
+            broker_mc=broker_mc,
+            broker_status=broker_status,
         )
-        con.commit()
+        if body.email:
+            db.set_email(username, str(body.email).strip().lower())
+
+        if role == "broker" and broker_mc:
+            try:
+                db.create_broker_request(username, broker_mc)
+            except Exception:
+                pass
+
+        try:
+            db.audit(username, "register", f"user:{username}", role)
+        except Exception:
+            pass
+
         return {"ok": True, "message": "Registered"}
-    finally:
-        con.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Registration failed: {e}")
 
 
 @router.post("/login")
 def login(body: LoginReq):
-    con = _connect()
+    username = (body.username or "").strip()
+    pw = body.password or ""
+    if not username or not pw:
+        raise HTTPException(status_code=400, detail="Username + password required")
+
+    row = db.get_user(username)
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    u = dict(row)
+
+    if int(u.get("account_locked") or 0) == 1:
+        raise HTTPException(status_code=403, detail="Account locked")
+
+    if not _verify(pw, u.get("password_hash") or ""):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    token = _access_token(
+        u.get("username") or username,
+        u.get("role") or "",
+        u.get("broker_status") or "none",
+        u.get("broker_mc"),
+    )
+
     try:
-        _init_schema(con)
+        db.audit(username, "login", f"user:{username}", None)
+    except Exception:
+        pass
 
-        row = con.execute(
-            "SELECT username, password_hash, role, broker_status, broker_mc FROM users WHERE username=?",
-            (body.username.strip(),),
-        ).fetchone()
-
-        if not row or not _verify(body.password, row["password_hash"]):
-            raise HTTPException(status_code=401, detail="Invalid username or password")
-
-        token = _access_token(row["username"], row["role"], row["broker_status"], row["broker_mc"])
-        return {
-            "ok": True,
-            "token": token,
-            "role": row["role"],
-            "broker_status": row["broker_status"],
-            "broker_mc": row["broker_mc"],
-        }
-    finally:
-        con.close()
+    return {
+        "ok": True,
+        "token": token,
+        "role": u.get("role"),
+        "broker_status": u.get("broker_status"),
+        "broker_mc": u.get("broker_mc"),
+    }
 
 
 @router.post("/forgot-password")
 def forgot_password(body: ForgotReq):
-    con = _connect()
-    try:
-        _init_schema(con)
-
-        row = con.execute(
-            "SELECT username, email FROM users WHERE username=?",
-            (body.username.strip(),),
-        ).fetchone()
-
-        if not row:
-            return {"ok": True}
-
-        if not row["email"]:
-            return {"ok": True}
-
-        token = _reset_token(row["username"])
-        base = os.environ.get("RESET_URL_BASE", "").rstrip("/")
-        link = f"{base}/reset-password?token={token}" if base else f"/reset-password?token={token}"
-
-        _send_email(
-            row["email"],
-            "Chequmate – Password Reset",
-            (
-                "You requested a password reset.\n\n"
-                f"Reset link (valid {RESET_EXP_MIN} minutes):\n{link}\n\n"
-                "If you didn’t request this, ignore this email.\n"
-            ),
-        )
+    username = (body.username or "").strip()
+    if not username:
         return {"ok": True}
-    finally:
-        con.close()
+
+    row = db.get_user(username)
+    if not row:
+        return {"ok": True}
+
+    u = dict(row)
+    email = (u.get("email") or "").strip().lower()
+    if not email:
+        return {"ok": True}
+
+    token = _reset_token(username)
+    base = (os.environ.get("RESET_URL_BASE") or "").rstrip("/")
+    link = f"{base}/reset-password?token={token}" if base else f"/reset-password?token={token}"
+
+    _send_email(
+        email,
+        "Chequmate – Password Reset",
+        (
+            "You requested a password reset.\n\n"
+            f"Reset link (valid {RESET_EXP_MIN} minutes):\n{link}\n\n"
+            "If you didn’t request this, ignore this email.\n"
+        ),
+    )
+    return {"ok": True}
 
 
 @router.post("/password-reset/request")
@@ -376,20 +384,23 @@ def password_reset_request(body: ForgotReq):
 def reset_password(body: ResetReq):
     username = _decode_reset(body.token)
 
-    if len(body.new_password) < 8:
+    if len(body.new_password or "") < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
-    con = _connect()
+    # Update using db._conn so schema is guaranteed consistent with db.py
     try:
-        _init_schema(con)
-        con.execute(
-            "UPDATE users SET password_hash=? WHERE username=?",
-            (_hash(body.new_password), username),
-        )
-        con.commit()
+        with db._conn() as con:
+            con.execute(
+                "UPDATE users SET password_hash=? WHERE username=?",
+                (_hash(body.new_password), username),
+            )
+        try:
+            db.audit(username, "password_reset", f"user:{username}", None)
+        except Exception:
+            pass
         return {"ok": True}
-    finally:
-        con.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Password reset failed: {e}")
 
 
 @router.post("/password-reset/confirm")

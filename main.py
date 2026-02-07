@@ -1,50 +1,152 @@
 from __future__ import annotations
 
-import os
+from pathlib import Path
+from typing import Callable, Optional
+
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
+
+import auth
+
+HERE = Path(__file__).resolve().parent
+FAVICON_PATH = HERE / "static" / "favicon.ico"
+
+
+def _is_public_path(path: str) -> bool:
+    # Public = allowed through the middleware (route itself can still enforce auth)
+    if path in {
+        "/", "/openapi.json", "/docs", "/redoc",
+
+        # Auth endpoints
+        "/login", "/register",
+        "/verify-token",
+        "/me/set-email",
+        "/forgot-password", "/password-reset/request",
+        "/reset-password", "/password-reset/confirm",
+
+        # UI pages
+        "/login-ui", "/driver-ui", "/broker-ui", "/dispatcher-ui", "/admin-ui",
+
+        # Assets
+        "/favicon.ico",
+
+        # Internal
+        "/__importcheck",
+    }:
+        return True
+
+    if path.startswith("/static/"):
+        return True
+    if path.startswith("/docs/") or path.startswith("/redoc/"):
+        return True
+    return False
+
+
+def _required_role_for_path(path: str) -> Optional[str]:
+    if path.startswith("/driver/"):
+        return "driver"
+    if path.startswith("/dispatcher/"):
+        return "dispatcher"
+    if path.startswith("/broker/"):
+        return "broker"
+    if path.startswith("/admin/"):
+        return "admin"
+    return None
+
+
+def _deny(status: int, msg: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content={"detail": msg})
+
 
 app = FastAPI(title="Chequmate Freight System", version="0.1.0")
 
-# Serve /static (your login.html, etc.)
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-if os.path.isdir(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-    print(f"[boot] mounted /static -> {STATIC_DIR}")
+try:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    print("[boot] mounted /static -> ./static")
+except Exception as e:
+    print("[boot] WARNING: could not mount /static:", repr(e))
 
 
-def _try_include(module_name: str, router_attr: str = "router") -> None:
+# Serve favicon as a real file (GET + HEAD)
+@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
+def favicon():
+    if not FAVICON_PATH.exists():
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+    return FileResponse(str(FAVICON_PATH))
+
+
+@app.middleware("http")
+async def rbac_abac_guard(request: Request, call_next: Callable):
+    path = request.url.path or "/"
+
+    if _is_public_path(path):
+        return await call_next(request)
+
+    required = _required_role_for_path(path)
+
+    # Deny-by-default for any unclassified route.
+    if required is None:
+        return _deny(403, "Access denied (unclassified route).")
+
+    # Authenticate
     try:
-        mod = __import__(module_name)
-        router = getattr(mod, router_attr)
-        app.include_router(router)
-        print(f"[boot] included router: {module_name}.{router_attr}")
+        user = auth.get_current_user(authorization=request.headers.get("authorization"))
     except Exception as e:
-        print(f"[boot] WARNING: could not include {module_name}.{router_attr}: {e!r}")
+        msg = getattr(e, "detail", None) or "Unauthorized"
+        code = getattr(e, "status_code", 401)
+        return _deny(int(code), str(msg))
+
+    # Enforce role
+    role = (user.get("role") or "").strip().lower()
+    if role != required:
+        return _deny(403, f"{required} role required")
+
+    # ABAC add-ons
+    if required == "broker":
+        if (user.get("broker_status") or "none").lower() != "approved":
+            return _deny(403, "Broker not approved")
+
+    if required == "dispatcher":
+        broker_mc = (user.get("broker_mc") or "").strip()
+        if not broker_mc:
+            return _deny(403, "Dispatcher not linked to a broker")
+
+    request.state.user = user
+    return await call_next(request)
 
 
-@app.get("/", include_in_schema=False)
-def root(request: Request):
-    accept = (request.headers.get("accept") or "").lower()
-    if "text/html" in accept:
-        return RedirectResponse(url="/login-ui", status_code=302)
-    return JSONResponse({"ok": True, "service": "chequmate-freight-local"})
+def _safe_include(modname: str):
+    try:
+        mod = __import__(modname)
+        router = getattr(mod, "router", None)
+        if router is None:
+            print(f"[boot] WARNING: {modname} has no router")
+            return
+        app.include_router(router)
+        print(f"[boot] included router: {modname}.router")
+    except Exception as e:
+        print(f"[boot] WARNING: could not include {modname}.router:", repr(e))
 
 
-# Core API / routers
-_try_include("auth")
-_try_include("loads")
-_try_include("broker")
-_try_include("driver")
-_try_include("dispatcher")
+for _m in [
+    "auth",
+    "loads",
+    "negotiate",
+    "fuel",
+    "pricing",
+    "fmcsa",
+    "admin",
+    "admin_ui",
+    "login_ui",
+    "broker_ui",
+    "driver_ui",
+    "dispatcher_ui",
+]:
+    _safe_include(_m)
 
-# Features
-_try_include("fuel")
-_try_include("negotiate")
 
-# UIs
-_try_include("broker_ui")
-_try_include("driver_ui")
-_try_include("dispatcher_ui")
-_try_include("login_ui")
+@app.get("/")
+def root():
+    return {"ok": True, "service": "chequmate-freight-local"}
