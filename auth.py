@@ -22,6 +22,29 @@ JWT_ALGO = "HS256"
 ACCESS_EXP_HOURS = 24
 RESET_EXP_MIN = 30
 
+# -------------------
+# Registration security
+# -------------------
+def _env_bool(name: str, default: str = "0") -> bool:
+    return (os.environ.get(name, default) or default).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+# If ENABLE_PUBLIC_REGISTER=1, users can self-register for non-admin roles.
+# In production, keep this OFF.
+ENABLE_PUBLIC_REGISTER = _env_bool("ENABLE_PUBLIC_REGISTER", "0")
+
+# Invite code required when public register is off, and ALWAYS required for admin role.
+REGISTER_INVITE_CODE = (os.environ.get("REGISTER_INVITE_CODE") or "").strip()
+
+# In dev/local, you can allow admin creation via env toggle if you really want.
+# In production, leave this OFF.
+ALLOW_ADMIN_REGISTER = _env_bool("ALLOW_ADMIN_REGISTER", "0")
+
+def _is_production() -> bool:
+    # Render sets RENDER=1. Also support generic ENV=production.
+    if _env_bool("RENDER", "0"):
+        return True
+    env = (os.environ.get("ENV") or os.environ.get("APP_ENV") or "").strip().lower()
+    return env in {"prod", "production", "live"}
 
 # -------------------
 # Password hashing
@@ -29,10 +52,8 @@ RESET_EXP_MIN = 30
 def _hash(pw: str) -> str:
     return pwd_context.hash(pw)
 
-
 def _verify(pw: str, hashed: str) -> bool:
     return pwd_context.verify(pw, hashed)
-
 
 # -------------------
 # JSON helper (some modules expect this)
@@ -43,7 +64,6 @@ async def read_json(request: Request) -> Dict[str, Any]:
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
-
 
 # -------------------
 # Email
@@ -69,7 +89,6 @@ def _send_email(to_email: str, subject: str, body: str) -> None:
         s.login(smtp_user, smtp_pass)
         s.send_message(msg)
 
-
 # -------------------
 # Tokens
 # -------------------
@@ -83,7 +102,6 @@ def _access_token(username: str, role: str, broker_status: str, broker_mc: Optio
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
-
 def _reset_token(username: str) -> str:
     payload = {
         "username": username,
@@ -91,7 +109,6 @@ def _reset_token(username: str) -> str:
         "exp": datetime.utcnow() + timedelta(minutes=RESET_EXP_MIN),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
-
 
 def _decode_reset(token: str) -> str:
     try:
@@ -102,7 +119,6 @@ def _decode_reset(token: str) -> str:
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
-
 def _decode_access_token(token: str) -> Dict[str, Any]:
     try:
         data = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
@@ -112,7 +128,6 @@ def _decode_access_token(token: str) -> Dict[str, Any]:
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-
 def _extract_bearer(authorization: Optional[str]) -> str:
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
@@ -121,7 +136,6 @@ def _extract_bearer(authorization: Optional[str]) -> str:
         raise HTTPException(status_code=401, detail="Invalid Authorization header")
     return parts[1].strip()
 
-
 # -------------------
 # AUTH exports
 # -------------------
@@ -129,13 +143,11 @@ def get_current_user(authorization: Optional[str] = Header(default=None)) -> Dic
     token = _extract_bearer(authorization)
     return _decode_access_token(token)
 
-
 def _role_check(user: Dict[str, Any], role: str) -> Dict[str, Any]:
     role = (role or "").strip().lower()
     if (user.get("role") or "").lower() != role:
         raise HTTPException(status_code=403, detail=f"{role} role required")
     return user
-
 
 def require_role(*args):
     """
@@ -173,18 +185,14 @@ def require_role(*args):
 
     raise TypeError("require_role expects (role) or (user_or_depends, role)")
 
-
 def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     return _role_check(user, "admin")
-
 
 def require_driver(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     return _role_check(user, "driver")
 
-
 def require_dispatcher(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     return _role_check(user, "dispatcher")
-
 
 def require_dispatcher_linked(user: Dict[str, Any] = Depends(require_dispatcher)) -> Dict[str, Any]:
     broker_mc = (user.get("broker_mc") or "").strip()
@@ -192,13 +200,11 @@ def require_dispatcher_linked(user: Dict[str, Any] = Depends(require_dispatcher)
         raise HTTPException(status_code=403, detail="Dispatcher not linked to a broker")
     return user
 
-
 def require_broker_approved(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     user = _role_check(user, "broker")
     if (user.get("broker_status") or "none").lower() != "approved":
         raise HTTPException(status_code=403, detail="Broker not approved")
     return user
-
 
 # -------------------
 # Models
@@ -209,25 +215,21 @@ class RegisterReq(BaseModel):
     password: str
     role: str
     broker_mc: Optional[str] = None
-
+    invite_code: Optional[str] = None  # NEW
 
 class LoginReq(BaseModel):
     username: str
     password: str
 
-
 class ForgotReq(BaseModel):
     username: str
-
 
 class ResetReq(BaseModel):
     token: str
     new_password: str
 
-
 class SetEmailReq(BaseModel):
     email: EmailStr
-
 
 # -------------------
 # Routes
@@ -235,7 +237,6 @@ class SetEmailReq(BaseModel):
 @router.get("/verify-token")
 def verify_token(u: Dict[str, Any] = Depends(get_current_user)):
     return {"ok": True, "user": u}
-
 
 @router.post("/me/set-email")
 async def me_set_email(request: Request, u: Dict[str, Any] = Depends(get_current_user)):
@@ -249,6 +250,29 @@ async def me_set_email(request: Request, u: Dict[str, Any] = Depends(get_current
         raise HTTPException(status_code=500, detail=f"Failed to set email: {e}")
     return {"ok": True, "username": u["username"], "email": email}
 
+def _require_invite_if_needed(role: str, invite_code: Optional[str]) -> None:
+    r = (role or "").strip().lower()
+
+    # Admin creation must be protected.
+    # In production, admin self-register is always blocked unless you intentionally enable it + set invite code.
+    if r == "admin":
+        if _is_production() and not ALLOW_ADMIN_REGISTER:
+            raise HTTPException(status_code=403, detail="Admin registration disabled")
+        if not REGISTER_INVITE_CODE:
+            raise HTTPException(status_code=403, detail="Admin registration not configured")
+        if (invite_code or "").strip() != REGISTER_INVITE_CODE:
+            raise HTTPException(status_code=403, detail="Invalid invite code")
+        return
+
+    # Non-admin roles:
+    if ENABLE_PUBLIC_REGISTER:
+        return
+
+    # If public register is OFF, require invite code for everybody else too.
+    if not REGISTER_INVITE_CODE:
+        raise HTTPException(status_code=403, detail="Registration disabled")
+    if (invite_code or "").strip() != REGISTER_INVITE_CODE:
+        raise HTTPException(status_code=403, detail="Invalid invite code")
 
 @router.post("/register")
 def register(body: RegisterReq):
@@ -261,6 +285,9 @@ def register(body: RegisterReq):
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     if role not in {"driver", "dispatcher", "broker", "admin"}:
         raise HTTPException(status_code=400, detail="Invalid role")
+
+    # SECURITY: lock down registration
+    _require_invite_if_needed(role, body.invite_code)
 
     existing = db.get_user(username)
     if existing:
@@ -303,7 +330,6 @@ def register(body: RegisterReq):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Registration failed: {e}")
 
-
 @router.post("/login")
 def login(body: LoginReq):
     username = (body.username or "").strip()
@@ -343,7 +369,6 @@ def login(body: LoginReq):
         "broker_mc": u.get("broker_mc"),
     }
 
-
 @router.post("/forgot-password")
 def forgot_password(body: ForgotReq):
     username = (body.username or "").strip()
@@ -374,11 +399,9 @@ def forgot_password(body: ForgotReq):
     )
     return {"ok": True}
 
-
 @router.post("/password-reset/request")
 def password_reset_request(body: ForgotReq):
     return forgot_password(body)
-
 
 @router.post("/reset-password")
 def reset_password(body: ResetReq):
@@ -387,7 +410,6 @@ def reset_password(body: ResetReq):
     if len(body.new_password or "") < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
-    # Update using db._conn so schema is guaranteed consistent with db.py
     try:
         with db._conn() as con:
             con.execute(
@@ -401,7 +423,6 @@ def reset_password(body: ResetReq):
         return {"ok": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Password reset failed: {e}")
-
 
 @router.post("/password-reset/confirm")
 def password_reset_confirm(body: ResetReq):
