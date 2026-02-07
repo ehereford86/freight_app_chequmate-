@@ -1,8 +1,23 @@
+# secrets / local env
 .env
+
+# local scratch / generated
 _trash/
+__pycache__/
+*.pyc
+
+# databases
+*.db
+
+# backups / artifacts
 *.bak
+*.bak.*
 *.merged.py
 *.fixed.py
 *.calc.py
-uvicorn.log
+*.broken.*
 openapi.json
+uvicorn.log
+
+# misc local folders you don't want in git
+.well-known/
