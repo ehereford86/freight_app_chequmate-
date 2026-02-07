@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request
+from typing import Any
 
 import fuel
-from auth import get_current_user_optional
+from auth import get_current_user, read_json
 
 router = APIRouter()
 
-def _to_float(v, default=0.0):
+def _safe_float(v: Any, default: float = 0.0) -> float:
     try:
         if v is None or v == "":
             return float(default)
@@ -15,7 +15,8 @@ def _to_float(v, default=0.0):
         return float(default)
 
 @router.get("/calculate-rate")
-def calculate_rate(
+async def calculate_rate(
+    request: Request,
     miles: float = 0.0,
     linehaul_rate: float = 0.0,
     deadhead_miles: float = 0.0,
@@ -23,71 +24,76 @@ def calculate_rate(
     detention: float = 0.0,
     lumper_fee: float = 0.0,
     extra_stop_fee: float = 0.0,
-    user=Depends(get_current_user_optional),
 ):
-    try:
-        miles = _to_float(miles, 0.0)
-        linehaul_rate = _to_float(linehaul_rate, 0.0)
-        deadhead_miles = _to_float(deadhead_miles, 0.0)
-        deadhead_rate = _to_float(deadhead_rate, 0.0)
-        detention = _to_float(detention, 0.0)
-        lumper_fee = _to_float(lumper_fee, 0.0)
-        extra_stop_fee = _to_float(extra_stop_fee, 0.0)
+    """
+    Public calculator (guest allowed):
+    - Uses LIVE diesel (EIA) when EIA_API_KEY is set.
+    - Returns role_context if token is present.
+    """
+    u = get_current_user(request)
+    role = (u.get("role") if u else "guest") or "guest"
+    broker_status = (u.get("broker_status") if u else "none") or "none"
 
-        linehaul_total = miles * linehaul_rate
-        deadhead_total = deadhead_miles * deadhead_rate
-        accessorials_total = detention + lumper_fee + extra_stop_fee
+    miles = _safe_float(miles, 0.0)
+    linehaul_rate = _safe_float(linehaul_rate, 0.0)
+    deadhead_miles = _safe_float(deadhead_miles, 0.0)
+    deadhead_rate = _safe_float(deadhead_rate, 0.0)
+    detention = _safe_float(detention, 0.0)
+    lumper_fee = _safe_float(lumper_fee, 0.0)
+    extra_stop_fee = _safe_float(extra_stop_fee, 0.0)
 
-        base_price = 1.25
-        multiplier = 0.06
+    diesel_price, meta = fuel.get_diesel_price()
 
-        diesel_price, meta = fuel.get_diesel_price()
-        if diesel_price is None:
-            per_mile = 0.0
-            fuel_error = "No diesel price available"
-            fuel_source = None
-        else:
-            per_mile = max(0.0, (float(diesel_price) - base_price) * multiplier)
-            fuel_error = None
-            fuel_source = "EIA"
+    base_price = 1.25
+    multiplier = 0.06
+    fsc_per_mile = 0.0
+    fuel_err = None
+    source = None
 
-        fuel_total = miles * per_mile
-        subtotal = linehaul_total + deadhead_total + accessorials_total
-        total = subtotal + fuel_total
+    if diesel_price is None:
+        fuel_err = (meta or {}).get("error") or "No diesel price available"
+        source = (meta or {}).get("source") or "EIA"
+    else:
+        source = (meta or {}).get("source") or "EIA"
+        fsc_per_mile = max(0.0, (float(diesel_price) - base_price) * multiplier)
 
-        return {
-            "inputs": {
-                "miles": miles,
-                "linehaul_rate": linehaul_rate,
-                "deadhead_miles": deadhead_miles,
-                "deadhead_rate": deadhead_rate,
-                "detention": detention,
-                "lumper_fee": lumper_fee,
-                "extra_stop_fee": extra_stop_fee,
-            },
-            "fuel": {
-                "diesel_price": diesel_price,
-                "base_price": base_price,
-                "multiplier_used": multiplier,
-                "fuel_surcharge_per_mile": per_mile,
-                "error": fuel_error,
-                "source": fuel_source,
-            },
-            "breakdown": {
-                "linehaul_total": linehaul_total,
-                "deadhead_total": deadhead_total,
-                "fuel_total": fuel_total,
-                "accessorials_total": accessorials_total,
-                "subtotal": subtotal,
-                "total": total,
-            },
-            "role_context": {
-                "logged_in": bool(user),
-                "role": (user["role"] if user else "guest"),
-                "broker_status": (user["broker_status"] if user else "none"),
-            },
-        }
-    except HTTPException:
-        raise
-    except Exception:
-        return JSONResponse(status_code=500, content={"detail": "Calculation failed"})
+    linehaul_total = miles * linehaul_rate
+    deadhead_total = deadhead_miles * deadhead_rate
+    fuel_total = miles * fsc_per_mile
+    accessorials_total = detention + lumper_fee + extra_stop_fee
+
+    subtotal = linehaul_total + deadhead_total
+    total = subtotal + fuel_total + accessorials_total
+
+    return {
+        "inputs": {
+            "miles": miles,
+            "linehaul_rate": linehaul_rate,
+            "deadhead_miles": deadhead_miles,
+            "deadhead_rate": deadhead_rate,
+            "detention": detention,
+            "lumper_fee": lumper_fee,
+            "extra_stop_fee": extra_stop_fee,
+        },
+        "fuel": {
+            "diesel_price": diesel_price,
+            "base_price": base_price,
+            "multiplier_used": multiplier,
+            "fuel_surcharge_per_mile": round(fsc_per_mile, 5),
+            "error": fuel_err,
+            "source": source,
+        },
+        "breakdown": {
+            "linehaul_total": round(linehaul_total, 3),
+            "deadhead_total": round(deadhead_total, 3),
+            "fuel_total": round(fuel_total, 3),
+            "accessorials_total": round(accessorials_total, 3),
+            "subtotal": round(subtotal, 3),
+            "total": round(total, 3),
+        },
+        "role_context": {
+            "logged_in": bool(u),
+            "role": role,
+            "broker_status": broker_status,
+        },
+    }

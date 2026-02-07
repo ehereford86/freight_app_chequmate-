@@ -1,97 +1,68 @@
-import os
-import requests
-from fastapi import APIRouter, Depends, HTTPException
-from auth import get_current_user, set_broker_request, set_user_role
+from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Any
+
+from auth import require_broker_approved, require_role, read_json
 
 router = APIRouter()
 
-FMCSA_KEY = (os.getenv("FMCSA_KEY") or "DEMO").strip()
+def _safe_str(v: Any) -> str:
+    return (v or "").strip()
 
-def lookup_mc(mc_number: str):
-    mc_number = (mc_number or "").strip()
-    if not mc_number:
-        return {"valid": False, "mc_number": mc_number, "error": "MC number required"}
+@router.get("/fmcsa/search")
+def fmcsa_search(
+    q: str = "",
+    u=Depends(require_role("admin", "broker")),
+):
+    """
+    Broker/Admin only.
+    Placeholder until you wire your real FMCSA verification approach.
 
-    url = f"https://mobile.fmcsa.dot.gov/qc/services/carriers/{mc_number}?webKey={FMCSA_KEY}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (ChequmateFreight/0.1)",
-        "Accept": "application/json,text/plain,*/*",
-    }
-
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        status = r.status_code
-        raw = (r.text or "").strip()
-
-        if status == 403:
-            return {"valid": False, "mc_number": mc_number, "error": "FMCSA blocked request (HTTP 403)"}
-
-        if status != 200:
-            return {"valid": False, "mc_number": mc_number, "error": f"FMCSA HTTP {status}", "raw": raw[:300]}
-
-        if not raw.startswith("{"):
-            return {"valid": False, "mc_number": mc_number, "error": "FMCSA returned non-JSON response", "raw": raw[:300]}
-
-        data = r.json()
-        carrier = (data.get("content") or {}).get("carrier") or {}
-        if not carrier:
-            return {"valid": False, "mc_number": mc_number, "error": "No carrier data returned"}
-
-        entity_type = (carrier.get("entityType") or "").upper()
-
-        if entity_type == "BROKER":
-            role = "broker"
-        elif entity_type in ("BROKER/CARRIER", "CARRIER/BROKER"):
-            role = "broker_carrier"
-        else:
-            role = "carrier"
-
-        return {
-            "valid": True,
-            "mc_number": mc_number,
-            "legal_name": carrier.get("legalName"),
-            "dot_number": carrier.get("dotNumber"),
-            "entity_type": carrier.get("entityType"),
-            "operating_status": carrier.get("operatingStatus"),
-            "role": role,
-            "is_broker": role in ("broker", "broker_carrier"),
-        }
-
-    except Exception as e:
-        return {"valid": False, "mc_number": mc_number, "error": f"FMCSA request failed: {str(e)}"}
-
-@router.get("/broker-onboard", description="If FMCSA works: set role based on entity type and mark approved.\nIf FMCSA blocked: mark pending (still stores MC).")
-def broker_onboard(mc_number: str, user=Depends(get_current_user)):
-    result = lookup_mc(mc_number)
-
-    # Verified broker
-    if result.get("valid") and result.get("role") in ("broker", "broker_carrier"):
-        set_broker_request(user["username"], mc_number, "approved")
-        set_user_role(user["username"], result["role"])
-        return {"success": True, "broker_status": "approved", "mc_number": mc_number, "details": result}
-
-    # Blocked
-    err = (result.get("error") or "")
-    if "403" in err:
-        set_broker_request(user["username"], mc_number, "pending")
-        return {"success": True, "broker_status": "pending", "mc_number": mc_number, "note": "FMCSA blocked; pending for admin review"}
-
-    # Not broker
-    set_broker_request(user["username"], mc_number, "rejected")
-    return {"success": True, "broker_status": "rejected", "mc_number": mc_number, "details": result}
-
-@router.get("/verify-broker")
-def verify_broker(user=Depends(get_current_user)):
-    # Must be broker role
-    if user.get("role") not in ("broker", "broker_carrier"):
-        raise HTTPException(status_code=403, detail="Broker access only")
-
-    # Must be approved
-    if (user.get("broker_status") or "none") != "approved":
+    Why this exists now:
+      - so /fmcsa endpoints show up in OpenAPI
+      - so the frontend can integrate today
+      - so role lockdown is enforced now
+    """
+    # If broker, must be approved
+    if u["role"] == "broker" and (u.get("broker_status") or "") != "approved":
         raise HTTPException(status_code=403, detail="Broker not approved")
 
-    mc_number = (user.get("mc_number") or "").strip()
-    if not mc_number:
-        raise HTTPException(status_code=400, detail="No MC number on file")
+    q = _safe_str(q)
+    if not q:
+        raise HTTPException(status_code=400, detail="Missing q")
 
-    return lookup_mc(mc_number)
+    # FMCSA blocked/not configured: return a stable 503 contract
+    return {
+        "ok": False,
+        "error": "FMCSA integration not configured/blocked. Endpoints are live; wire provider or dataset next.",
+        "query": q,
+        "results": [],
+    }
+
+@router.post("/fmcsa/verify")
+async def fmcsa_verify(
+    request: Request,
+    u=Depends(require_role("admin", "broker")),
+):
+    """
+    Broker/Admin only.
+    Accepts JSON: { "mc_number": "123456" } OR { "dot_number": "123456" }
+    Returns stable contract for frontend wiring.
+    """
+    if u["role"] == "broker" and (u.get("broker_status") or "") != "approved":
+        raise HTTPException(status_code=403, detail="Broker not approved")
+
+    body = await read_json(request)
+    mc = _safe_str(body.get("mc_number") or body.get("mc") or "")
+    dot = _safe_str(body.get("dot_number") or body.get("dot") or "")
+
+    if not mc and not dot:
+        raise HTTPException(status_code=400, detail="Provide mc_number or dot_number")
+
+    return {
+        "ok": False,
+        "verified": False,
+        "status": "unverified",
+        "mc_number": mc or None,
+        "dot_number": dot or None,
+        "error": "FMCSA integration not configured/blocked. Endpoints are live; wire provider or dataset next.",
+    }

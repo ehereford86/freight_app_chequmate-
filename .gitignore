@@ -1,7 +1,8 @@
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.db
-backups*/
-.DS_Store
+.env
+_trash/
+*.bak
+*.merged.py
+*.fixed.py
+*.calc.py
+uvicorn.log
+openapi.json

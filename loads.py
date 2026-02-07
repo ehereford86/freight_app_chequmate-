@@ -110,7 +110,7 @@ def _extract_us_zip(addr: str) -> str | None:
 # DRIVER (Assigned loads + calculator + status)
 # -----------------------------
 @router.get("/driver/loads")
-def driver_list_loads(u=Depends(require_driver())):
+def driver_list_loads(u=Depends(require_driver)):
     rows = db.list_loads_by_driver(u["username"])
     loads = [dict(r) for r in rows]
     for l in loads:
@@ -119,7 +119,7 @@ def driver_list_loads(u=Depends(require_driver())):
     return {"ok": True, "loads": loads}
 
 @router.get("/driver/loads/{load_id}")
-def driver_get_load(load_id: int, u=Depends(require_driver())):
+def driver_get_load(load_id: int, u=Depends(require_driver)):
     load = _require_load(load_id)
     _driver_can_access(load, u["username"])
     view = {
@@ -146,7 +146,7 @@ def driver_get_load(load_id: int, u=Depends(require_driver())):
     return {"ok": True, "load": view}
 
 @router.post("/driver/miles")
-async def driver_zip_miles(request: Request, u=Depends(require_driver())):
+async def driver_zip_miles(request: Request, u=Depends(require_driver)):
     body = await read_json(request)
     origin_zip = (body.get("origin_zip") or "").strip()
     dest_zip = (body.get("dest_zip") or "").strip()
@@ -159,7 +159,7 @@ async def driver_zip_miles(request: Request, u=Depends(require_driver())):
     return {"ok": True, "origin_zip": origin_zip, "dest_zip": dest_zip, "country": country, "miles": miles, "seconds": seconds, "meta": meta}
 
 @router.post("/driver/pay-calc")
-async def driver_pay_calc(request: Request, u=Depends(require_driver())):
+async def driver_pay_calc(request: Request, u=Depends(require_driver)):
     body = await read_json(request)
 
     origin_zip = (body.get("origin_zip") or "").strip()
@@ -235,7 +235,7 @@ async def driver_pay_calc(request: Request, u=Depends(require_driver())):
     }
 
 @router.post("/driver/loads/{load_id}/accept")
-async def driver_accept(load_id: int, u=Depends(require_driver())):
+async def driver_accept(load_id: int, u=Depends(require_driver)):
     load = _require_load(load_id)
     _driver_can_access(load, u["username"])
     _require_not_paid(load)
@@ -248,7 +248,7 @@ async def driver_accept(load_id: int, u=Depends(require_driver())):
     return {"ok": True, "load_id": int(load_id), "status": "accepted"}
 
 @router.post("/driver/loads/{load_id}/status")
-async def driver_set_status(load_id: int, request: Request, u=Depends(require_driver())):
+async def driver_set_status(load_id: int, request: Request, u=Depends(require_driver)):
     load = _require_load(load_id)
     _driver_can_access(load, u["username"])
     _require_not_paid(load)
@@ -283,19 +283,19 @@ async def driver_set_status(load_id: int, request: Request, u=Depends(require_dr
 # DISPATCHER (Published board + assign/unassign/release + driver roster)
 # -----------------------------
 @router.get("/dispatcher/loads")
-def dispatcher_list_loads(u=Depends(require_dispatcher_linked())):
+def dispatcher_list_loads(u=Depends(require_dispatcher_linked)):
     rows = db.list_loads_published_by_dispatcher(u["username"], u["broker_mc"])
     return {"ok": True, "loads": [dict(r) for r in rows]}
 
 @router.get("/dispatcher/loads/{load_id}")
-def dispatcher_get_load(load_id: int, u=Depends(require_dispatcher_linked())):
+def dispatcher_get_load(load_id: int, u=Depends(require_dispatcher_linked)):
     load = _require_load(load_id)
     _dispatcher_can_access(load, u)
     return {"ok": True, "load": load}
 
 
 @router.get("/dispatcher/drivers")
-def dispatcher_list_drivers(u=Depends(require_dispatcher_linked())):
+def dispatcher_list_drivers(u=Depends(require_dispatcher_linked)):
     rows = db.list_users_by_role_and_broker_mc("driver", u["broker_mc"], limit=500)
     drivers = [dict(r).get("username") for r in rows]
     drivers = [d for d in drivers if d]
@@ -303,7 +303,7 @@ def dispatcher_list_drivers(u=Depends(require_dispatcher_linked())):
     return {"ok": True, "drivers": drivers}
 
 @router.post("/dispatcher/loads/{load_id}/assign-driver")
-async def dispatcher_assign_driver(load_id: int, request: Request, u=Depends(require_dispatcher_linked())):
+async def dispatcher_assign_driver(load_id: int, request: Request, u=Depends(require_dispatcher_linked)):
     load = _require_load(load_id)
     _dispatcher_can_access(load, u)
     _require_published(load)
@@ -331,7 +331,7 @@ async def dispatcher_assign_driver(load_id: int, request: Request, u=Depends(req
     return {"ok": True, "load_id": int(load_id), "driver_username": driver_username}
 
 @router.post("/dispatcher/loads/{load_id}/unassign-driver")
-async def dispatcher_unassign_driver(load_id: int, u=Depends(require_dispatcher_linked())):
+async def dispatcher_unassign_driver(load_id: int, u=Depends(require_dispatcher_linked)):
     load = _require_load(load_id)
     _dispatcher_can_access(load, u)
     _require_published(load)
@@ -347,7 +347,7 @@ async def dispatcher_unassign_driver(load_id: int, u=Depends(require_dispatcher_
     return {"ok": True, "load_id": int(load_id), "unassigned": True}
 
 @router.post("/dispatcher/loads/{load_id}/release")
-async def dispatcher_release(load_id: int, u=Depends(require_dispatcher_linked())):
+async def dispatcher_release(load_id: int, u=Depends(require_dispatcher_linked)):
     load = _require_load(load_id)
     _dispatcher_can_access(load, u)
     _require_published(load)
@@ -369,18 +369,18 @@ async def dispatcher_release(load_id: int, u=Depends(require_dispatcher_linked()
 # BROKER (approved)
 # -----------------------------
 @router.get("/broker/loads")
-def broker_list_loads(u=Depends(require_broker_approved())):
+def broker_list_loads(u=Depends(require_broker_approved)):
     rows = db.list_loads_by_broker(u["broker_mc"])
     return {"ok": True, "loads": [dict(r) for r in rows]}
 
 @router.get("/broker/loads/{load_id}")
-def broker_get_load(load_id: int, u=Depends(require_broker_approved())):
+def broker_get_load(load_id: int, u=Depends(require_broker_approved)):
     load = _require_load(load_id)
     _broker_can_access(load, u)
     return {"ok": True, "load": load}
 
 @router.post("/broker/loads/{load_id}/route-miles")
-async def broker_route_miles(load_id: int, request: Request, u=Depends(require_broker_approved())):
+async def broker_route_miles(load_id: int, request: Request, u=Depends(require_broker_approved)):
     """
     Auto-calc miles for Negotiation Calculator:
       loaded_miles = routed miles (zip->zip)
@@ -434,7 +434,7 @@ async def broker_route_miles(load_id: int, request: Request, u=Depends(require_b
     }
 
 @router.get("/broker/loads/{load_id}/negotiations")
-def broker_list_negotiations(load_id: int, limit: int = 20, u=Depends(require_broker_approved())):
+def broker_list_negotiations(load_id: int, limit: int = 20, u=Depends(require_broker_approved)):
     load = _require_load(load_id)
     _broker_can_access(load, u)
 
@@ -458,7 +458,7 @@ def broker_list_negotiations(load_id: int, limit: int = 20, u=Depends(require_br
     return {"ok": True, "load_id": int(load_id), "negotiations": out}
 
 @router.post("/broker/loads/create")
-async def broker_create_load(request: Request, u=Depends(require_broker_approved())):
+async def broker_create_load(request: Request, u=Depends(require_broker_approved)):
     body = await read_json(request)
 
     pickup_address = (body.get("pickup_address") or "").strip()
@@ -511,7 +511,7 @@ async def broker_create_load(request: Request, u=Depends(require_broker_approved
 # -----------------------------
 
 @router.post("/broker/loads/{load_id}/publish")
-async def broker_publish_load(load_id: int, u=Depends(require_broker_approved())):
+async def broker_publish_load(load_id: int, u=Depends(require_broker_approved)):
     load = _require_load(load_id)
     _broker_can_access(load, u)
 
@@ -529,7 +529,7 @@ async def broker_publish_load(load_id: int, u=Depends(require_broker_approved())
     return {"ok": True, "load_id": int(load_id), "visibility": "published"}
 
 @router.post("/broker/loads/{load_id}/cancel")
-async def broker_cancel_load(load_id: int, request: Request, u=Depends(require_broker_approved())):
+async def broker_cancel_load(load_id: int, request: Request, u=Depends(require_broker_approved)):
     load = _require_load(load_id)
     _broker_can_access(load, u)
 
@@ -550,7 +550,7 @@ async def broker_cancel_load(load_id: int, request: Request, u=Depends(require_b
     return {"ok": True, "load_id": int(load_id), "visibility": "pulled", "pulled_reason": reason}
 
 @router.post("/broker/loads/{load_id}/delete")
-async def broker_delete_load(load_id: int, u=Depends(require_broker_approved())):
+async def broker_delete_load(load_id: int, u=Depends(require_broker_approved)):
     load = _require_load(load_id)
     _broker_can_access(load, u)
 
@@ -568,7 +568,7 @@ async def broker_delete_load(load_id: int, u=Depends(require_broker_approved()))
     return {"ok": True, "load_id": int(load_id), "deleted": True}
 
 @router.post("/broker/loads/{load_id}/update")
-async def broker_update_load(load_id: int, request: Request, u=Depends(require_broker_approved())):
+async def broker_update_load(load_id: int, request: Request, u=Depends(require_broker_approved)):
     load = _require_load(load_id)
     _broker_can_access(load, u)
 
@@ -631,7 +631,7 @@ async def broker_update_load(load_id: int, request: Request, u=Depends(require_b
 # ✅ NEW: BROKER INVOICE (NO DELIVERED REQUIRED)
 # -----------------------------
 @router.post("/broker/loads/{load_id}/invoice")
-async def broker_invoice_load(load_id: int, u=Depends(require_broker_approved())):
+async def broker_invoice_load(load_id: int, u=Depends(require_broker_approved)):
     load = _require_load(load_id)
     _broker_can_access(load, u)
 
@@ -658,7 +658,7 @@ async def broker_invoice_load(load_id: int, u=Depends(require_broker_approved())
 # ✅ NEW: BROKER MARK PAID (FINAL LOCK)
 # -----------------------------
 @router.post("/broker/loads/{load_id}/paid")
-async def broker_mark_paid(load_id: int, u=Depends(require_broker_approved())):
+async def broker_mark_paid(load_id: int, u=Depends(require_broker_approved)):
     load = _require_load(load_id)
     _broker_can_access(load, u)
 
