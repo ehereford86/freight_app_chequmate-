@@ -143,7 +143,7 @@ def require_role(*args):
     Supports:
     - require_role("admin") as dependency factory
     - require_role(user_dict, "admin") direct check
-    - tolerate legacy odd styles without crashing
+    - tolerates legacy odd styles without crashing
     """
     if len(args) == 1:
         role = (args[0] or "").strip().lower()
@@ -239,7 +239,6 @@ class BootstrapAdminReq(BaseModel):
 def _require_env_admin_key(admin_key: Optional[str]) -> None:
     expected = (os.environ.get("ADMIN_KEY") or "").strip()
     if not expected:
-        # If you forgot to set it on Render, we refuse to run (safe default).
         raise HTTPException(status_code=503, detail="ADMIN_KEY not configured")
     if (admin_key or "").strip() != expected:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -248,7 +247,6 @@ def _require_env_admin_key(admin_key: Optional[str]) -> None:
 def _invite_required_for_brokers(invite_code: Optional[str]) -> None:
     expected = (os.environ.get("BROKER_INVITE_CODE") or "").strip()
     if not expected:
-        # If you didn’t configure it, brokers cannot self-register.
         raise HTTPException(status_code=503, detail="BROKER_INVITE_CODE not configured")
     if (invite_code or "").strip() != expected:
         raise HTTPException(status_code=403, detail="Invite code required")
@@ -303,13 +301,15 @@ async def me_change_password(body: ChangePasswordReq, u: Dict[str, Any] = Depend
         raise HTTPException(status_code=500, detail=f"Failed to change password: {e}")
 
 
-@router.post("/admin/bootstrap-admin", include_in_schema=False)
+@router.post("/_admin/bootstrap-admin", include_in_schema=False)
 def bootstrap_admin(body: BootstrapAdminReq, admin_key: Optional[str] = Query(default=None)):
     """
     Emergency admin recovery for Render.
 
     Requires ?admin_key=... which must match env ADMIN_KEY.
     Creates admin user if missing, or resets password if it exists.
+
+    NOTE: Path is intentionally NOT under /admin to avoid collisions with admin router auth.
     """
     _require_env_admin_key(admin_key)
 
